@@ -21,41 +21,49 @@ namespace Models.PMF.Struct
     [ValidParent(ParentType = typeof(LeafCulms))]
     public class FixedTillering : Model, ITilleringMethod
     {
+        /// <summary>
+        /// Link to clock (used for FTN calculations at time of sowing).
+        /// </summary>
+        [Link]
+        private readonly IClock clock = null;
+
+        /// <summary>
+        /// Link to weather.
+        /// </summary>
+        [Link]
+        private readonly IWeather weather = null;
+
         /// <summary>The parent Plant</summary>
         [Link]
-        Plant plant = null;
+        private readonly Plant plant = null;
 
         /// <summary> Culms on the leaf </summary>
         [Link]
-        public LeafCulms culms = null;
+        private readonly LeafCulms culms = null;
 
         /// <summary>The parent tilering class</summary>
         [Link]
-        Phenology phenology = null;
+        private readonly Phenology phenology = null;
 
         /// <summary>The parent tilering class</summary>
         [Link]
-        SorghumLeaf leaf = null;
-
-        /// <summary>The met data</summary>
-        [Link]
-        private IWeather metData = null;
+        private readonly SorghumLeaf leaf = null;
 
         /// <summary> Culms on the leaf </summary>
         [Link(Type = LinkType.Child, ByName = true)]
-        IFunction areaCalc = null;
+        private readonly IFunction areaCalc = null;
 
         /// <summary> Propoensity to Tiller Intercept </summary>
         [Link(Type = LinkType.Child, ByName = true)]
-        IFunction tillerSdIntercept = null;
+        private readonly IFunction tillerSdIntercept = null;
 
         /// <summary> Propsenity to Tiller Slope </summary>
         [Link(Type = LinkType.Child, ByName = true)]
-        IFunction tillerSdSlope = null;
+        private readonly IFunction tillerSdSlope = null;
 
         /// <summary> LAI Value where tillers are no longer added </summary>
         [Link(Type = LinkType.Child, ByName = true)]
-        IFunction maxLAIForTillerAddition = null;
+        private readonly IFunction maxLAIForTillerAddition = null;
 
         /// <summary>Number of potential Fertile Tillers at harvest</summary>
         [JsonIgnore]
@@ -74,22 +82,20 @@ namespace Models.PMF.Struct
         public double FertileTillerNumber
         {
             get => CurrentTillerNumber;
-            set { throw new Exception("Cannot set the FertileTillerNumber for Dynamic Tillering. Make sure you set TilleringMethod before FertileTillerNmber"); }
+            set => CurrentTillerNumber = value;
         }
 
         /// <summary>Supply Demand Ratio used to calculate Tiller No</summary>
         [JsonIgnore]
         public double SupplyDemandRatio { get; private set; }
 
-        private const int startThermalQuotientLeafNo = 3;
-        private const int endThermalQuotientLeafNo = 5;
         private double specifiedFertileTillerNumber = 0.0;
         private double plantsPerMetre;
         private double population;
-        private double linearLAI;
         private double radiationValues = 0.0;
         private double temperatureValues = 0.0;
-        private readonly List<int> tillerOrder = new();
+        private bool isRuleOfThumbTilleringMethod = false;
+        private List<int> tillerOrder = new();
 
         private double GetDeltaDmGreen() { return leaf.potentialDMAllocation.Structural; }
 
@@ -126,13 +132,53 @@ namespace Models.PMF.Struct
 
             var newLeafNo = (int)Math.Floor(mainCulm.CurrentLeafNo);
 
-            if (nLeaves > startThermalQuotientLeafNo)
+            if (nLeaves > TilleringCalculations.START_THERMAL_QUOTIENT_LEAF_NO)
             {
                 CalcTillers(newLeafNo, existingLeafNo);
                 CalcTillerAppearance(newLeafNo, existingLeafNo);
             }
 
             return dltLeafNoMainCulm;
+        }
+
+        /// <summary>Calculate the potential leaf area</summary>
+        public double CalcPotentialLeafArea()
+        {
+            culms.Culms.ForEach(c => c.DltLAI = 0);
+            if (phenology.BeforeFloweringStage())
+            {
+                return areaCalc.Value();
+            }
+            return 0.0;
+        }
+
+        /// <summary> calculate the actual leaf area</summary>
+        public double CalcActualLeafArea(double dltStressedLAI)
+        {
+            var mainCulm = culms.Culms.FirstOrDefault();
+
+            double laiSlaReductionFraction = CalcCarbonLimitation(dltStressedLAI);
+            double leaf = mainCulm.CurrentLeafNo;
+            var dltLAI = Math.Max(dltStressedLAI * laiSlaReductionFraction, 0.0);
+
+            culms.Culms.ForEach(c => c.TotalLAI += c.DltStressedLAI);
+
+            return dltLAI;
+        }
+
+        /// <summary>
+        /// Calculate SLA for leafa rea including potential new growth - stressess effect
+        /// </summary>
+        /// <param name="stressedLAI"></param>
+        /// <returns></returns>
+        public double CalcCurrentSLA(double stressedLAI)
+        {
+            double dmGreen = leaf.Live.Wt;
+            double dltDmGreen = GetDeltaDmGreen();
+
+            if (dmGreen + dltDmGreen <= 0.0) return 0.0;
+
+            return (leaf.LAI + stressedLAI) / (dmGreen + dltDmGreen) * 10000; // (cm^2/g)
         }
 
         private double CalcLeafAppearance(Culm culm)
@@ -153,13 +199,14 @@ namespace Models.PMF.Struct
 
             // Up to L5 FE store PTQ. At L5 FE calculate tiller number (endThermalQuotientLeafNo).
             // At L5 FE newLeaf = 6 and currentLeaf = 5
-            if (newLeaf >= startThermalQuotientLeafNo && currentLeaf < endThermalQuotientLeafNo)
+            if (newLeaf >= TilleringCalculations.START_THERMAL_QUOTIENT_LEAF_NO && 
+                currentLeaf < TilleringCalculations.END_THERMAL_QUOTIENT_LEAF_NO)
             {
-                radiationValues += metData.Radn;
+                radiationValues += weather.Radn;
                 temperatureValues += phenology.thermalTime.Value();
 
                 // L5 Fully Expanded
-                if (newLeaf == endThermalQuotientLeafNo)
+                if (newLeaf == TilleringCalculations.END_THERMAL_QUOTIENT_LEAF_NO)
                 {
                     double PTQ = radiationValues / temperatureValues;
                     CalcTillerNumber(PTQ);
@@ -192,40 +239,13 @@ namespace Models.PMF.Struct
             );
         }
 
-        void AddInitialTillers()
+        private void AddInitialTillers()
         {
-            tillerOrder.Clear();
+            tillerOrder = TilleringCalculations.CalculateTillerOrder(CalculatedTillerNumber);
 
             if (CalculatedTillerNumber <= 0) return;
 
-            // Lafarge et al. (2002) reported a common hierarchy of tiller emergence of T3>T4>T2>T1>T5>T6 across diverse density treatments
-            // 1 tiller  = T3 
-            // 2 tillers = T3 + T4
-            // 3 tillers = T2 + T3 + T4
-            // 4 tillers = T1 + T2 + T3 + T4
-            // 5 tillers = T1 + T2 + T3 + T4 + T5
-            // 6 tillers = T1 + T2 + T3 + T4 + T5 + T6
-
-            // At leaf 5 fully expanded only initialize T1 with 2 leaves if present.
-
             int nTillers = (int)Math.Ceiling(CalculatedTillerNumber);
-            if (nTillers <= 0) return;
-
-            if (nTillers < 3) tillerOrder.Add(3);
-            if (nTillers == 2) tillerOrder.Add(4);
-            if (nTillers == 3)
-            {
-                tillerOrder.Add(2);
-                tillerOrder.Add(3);
-                tillerOrder.Add(4);
-            }
-            if (nTillers > 3)
-            {
-                for (int i = 1; i <= nTillers; i++)
-                {
-                    tillerOrder.Add(i);
-                }
-            }
 
             if (nTillers > 3)
             {
@@ -247,7 +267,7 @@ namespace Models.PMF.Struct
             // 4. there should be a tiller at that node. (Check tillerOrder)
 
             var tillersAdded = culms.Culms.Count - 1;
-            double lLAI = CalcLinearLAI();
+            double lLAI = TilleringCalculations.CalcLinearLAI(leaf, population, plantsPerMetre);
 
             if (newLeaf >= 5 &&
                 newLeaf > currentLeaf &&
@@ -269,17 +289,10 @@ namespace Models.PMF.Struct
             }
         }
 
-        private double CalcLinearLAI()
-        {
-            var tpla = (leaf.LAI + leaf.SenescedLai) / population * 10000; // Leaf area of one plant.
-            linearLAI = plantsPerMetre * tpla / 10000.0;
-            return linearLAI;
-        }
-
         /// <summary>
         /// Add a tiller.
         /// </summary>
-        void InitiateTiller(int tillerNumber, double fractionToAdd, double initialLeaf)
+        private void InitiateTiller(int tillerNumber, double fractionToAdd, double initialLeaf)
         {
             double leafNoAtAppearance = 1.0;
             Culm newCulm = new(leafNoAtAppearance)
@@ -292,51 +305,6 @@ namespace Models.PMF.Struct
             };
             newCulm.UpdatePotentialLeafSizes(areaCalc as ICulmLeafArea);
             culms.Culms.Add(newCulm);
-        }
-
-        /// <summary>Calculate the potential leaf area</summary>
-        public double CalcPotentialLeafArea()
-        {
-            culms.Culms.ForEach(c => c.DltLAI = 0);
-            if (phenology.BeforeFloweringStage())
-            {
-                return areaCalc.Value();
-            }
-            return 0.0;
-        }
-
-        /// <summary> calculate the actual leaf area</summary>
-        public double CalcActualLeafArea(double dltStressedLAI)
-        {
-            var mainCulm = culms.Culms.FirstOrDefault();
-
-            if (mainCulm != null &&
-                phenology.AfterEndJuvenileStage() &&
-                CalculatedTillerNumber > 0.0 &&
-                mainCulm.CurrentLeafNo < mainCulm.PositionOfLargestLeaf
-            )
-            {
-                //CalculateTillerCessation(dltStressedLAI);
-            }
-
-            // recalculate todays LAI
-            var dltStressedLAI2 = 0.0;
-            foreach (var culm in culms.Culms)
-                dltStressedLAI2 += culm.DltLAI;
-
-            double laiSlaReductionFraction = CalcCarbonLimitation(dltStressedLAI2);
-            double leaf = mainCulm.CurrentLeafNo;
-            var dltLAI = Math.Max(dltStressedLAI2 * laiSlaReductionFraction, 0.0);
-
-            // Apply to each culm
-            if (laiSlaReductionFraction < 1.0)
-            {
-                //ReduceAllTillersProportionately(laiSlaReductionFraction);
-            }
-
-            culms.Culms.ForEach(c => c.TotalLAI += c.DltStressedLAI);
-
-            return dltLAI;
         }
 
         private double CalcCarbonLimitation(double dltStressedLAI)
@@ -358,21 +326,6 @@ namespace Models.PMF.Struct
             return fraction;
         }
 
-        /// <summary>
-        /// Calculate SLA for leafa rea including potential new growth - stressess effect
-        /// </summary>
-        /// <param name="stressedLAI"></param>
-        /// <returns></returns>
-        public double CalcCurrentSLA(double stressedLAI)
-        {
-            double dmGreen = leaf.Live.Wt;
-            double dltDmGreen = GetDeltaDmGreen();
-
-            if (dmGreen + dltDmGreen <= 0.0) return 0.0;
-
-            return (leaf.LAI + stressedLAI) / (dmGreen + dltDmGreen) * 10000; // (cm^2/g)
-        }
-
         /// <summary> Reset Culms at start of the simulation </summary>
         [EventSubscribe("StartOfSimulation")]
         private void StartOfSim(object sender, EventArgs e)
@@ -391,15 +344,28 @@ namespace Models.PMF.Struct
         {
             if (data.Plant == plant)
             {
-                population = data.Population;
-                plantsPerMetre = data.Population * data.RowSpacing / 1000.0 * data.SkipDensityScale;
                 CurrentTillerNumber = 0.0;
+
+                isRuleOfThumbTilleringMethod = IsRuleOfThumbTilleringMethod(data.TilleringMethod);
+
+                if (isRuleOfThumbTilleringMethod)
+                {
+                    CurrentTillerNumber = TilleringCalculations.CalculateFtnRuleOfThumb(clock, plant, weather);
+                }
+
+                population = data.Population;
+                plantsPerMetre = data.Population * data.RowSpacing / 1000.0 * data.SkipDensityScale;                
                 CalculatedTillerNumber = 0.0;
                 specifiedFertileTillerNumber = data.FTN;
 
                 radiationValues = 0.0;
                 temperatureValues = 0.0;
             }
+        }
+
+        private static bool IsRuleOfThumbTilleringMethod(int tilleringMethod)
+        {
+            return tilleringMethod == -1;
         }
     }
 }

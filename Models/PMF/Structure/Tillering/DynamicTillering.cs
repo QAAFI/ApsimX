@@ -23,7 +23,7 @@ namespace Models.PMF.Struct
     {
         /// <summary>The parent Plant</summary>
         [Link]
-        Plant plant = null;
+        private readonly Plant plant = null;
 
         /// <summary> Culms on the leaf </summary>
         [Link]
@@ -31,39 +31,39 @@ namespace Models.PMF.Struct
 
         /// <summary>The parent tilering class</summary>
         [Link]
-        Phenology phenology = null;
+        private readonly Phenology phenology = null;
 
         /// <summary>The parent tilering class</summary>
         [Link]
-        SorghumLeaf leaf = null;
+        private readonly SorghumLeaf leaf = null;
 
         /// <summary>The met data</summary>
         [Link]
-        private IWeather metData = null;
+        private readonly IWeather weather = null;
 
         /// <summary> Culms on the leaf </summary>
         [Link(Type = LinkType.Child, ByName = true)]
-        IFunction areaCalc = null;
+        private readonly IFunction areaCalc = null;
 
         /// <summary> Propoensity to Tiller Intercept </summary>
         [Link(Type = LinkType.Child, ByName = true)]
-        IFunction tillerSdIntercept = null;
+        private readonly IFunction tillerSdIntercept = null;
 
         /// <summary> Propsenity to Tiller Slope </summary>
         [Link(Type = LinkType.Child, ByName = true)]
-        IFunction tillerSdSlope = null;
+        private readonly IFunction tillerSdSlope = null;
 
         /// <summary> LAI Value where tillers are no longer added </summary>
         [Link(Type = LinkType.Child, ByName = true)]
-        IFunction maxLAIForTillerAddition = null;
+        private readonly IFunction maxLAIForTillerAddition = null;
 
         /// <summary> LAI Value where tillers are no longer added </summary>
         [Link(Type = LinkType.Child, ByName = true)]
-        IFunction MaxDailyTillerReduction = null;
+        private readonly IFunction MaxDailyTillerReduction = null;
 
         /// <summary> LAI Value where tillers are no longer added </summary>
         [Link(Type = LinkType.Child, ByName = true)]
-        IFunction tillerSlaBound = null;
+        private readonly IFunction tillerSlaBound = null;
 
         /// <summary>Number of potential Fertile Tillers at harvest</summary>
         [JsonIgnore]
@@ -89,14 +89,12 @@ namespace Models.PMF.Struct
         [JsonIgnore]
         public double SupplyDemandRatio { get; private set; }
 
-        private const int startThermalQuotientLeafNo = 3;
-        private const int endThermalQuotientLeafNo = 5;
         private double plantsPerMetre;
         private double population;
         private double linearLAI;
         private double radiationValues = 0.0;
         private double temperatureValues = 0.0;
-        private readonly List<int> tillerOrder = new();
+        private List<int> tillerOrder = new();
 
         private double GetDeltaDmGreen() { return leaf.potentialDMAllocation.Structural; }
 
@@ -133,7 +131,7 @@ namespace Models.PMF.Struct
 
             var newLeafNo = (int)Math.Floor(mainCulm.CurrentLeafNo);
 
-            if (nLeaves > startThermalQuotientLeafNo)
+            if (nLeaves > TilleringCalculations.START_THERMAL_QUOTIENT_LEAF_NO)
             {
                 CalcTillers(newLeafNo, existingLeafNo);
                 CalcTillerAppearance(newLeafNo, existingLeafNo);
@@ -160,13 +158,14 @@ namespace Models.PMF.Struct
 
             // Up to L5 FE store PTQ. At L5 FE calculate tiller number (endThermalQuotientLeafNo).
             // At L5 FE newLeaf = 6 and currentLeaf = 5
-            if (newLeaf >= startThermalQuotientLeafNo && currentLeaf < endThermalQuotientLeafNo)
+            if (newLeaf >= TilleringCalculations.START_THERMAL_QUOTIENT_LEAF_NO && 
+                currentLeaf < TilleringCalculations.END_THERMAL_QUOTIENT_LEAF_NO)
             {
-                radiationValues += metData.Radn;
+                radiationValues += weather.Radn;
                 temperatureValues += phenology.thermalTime.Value();
 
                 // L5 Fully Expanded
-                if (newLeaf == endThermalQuotientLeafNo)
+                if (newLeaf == TilleringCalculations.END_THERMAL_QUOTIENT_LEAF_NO)
                 {
                     double PTQ = radiationValues / temperatureValues;
                     CalcTillerNumber(PTQ);
@@ -197,40 +196,13 @@ namespace Models.PMF.Struct
             );
         }
 
-        void AddInitialTillers()
+        private void AddInitialTillers()
         {
-            tillerOrder.Clear();
+            tillerOrder = TilleringCalculations.CalculateTillerOrder(CalculatedTillerNumber);
 
             if (CalculatedTillerNumber <= 0) return;
 
-            // Lafarge et al. (2002) reported a common hierarchy of tiller emergence of T3>T4>T2>T1>T5>T6 across diverse density treatments
-            // 1 tiller  = T3 
-            // 2 tillers = T3 + T4
-            // 3 tillers = T2 + T3 + T4
-            // 4 tillers = T1 + T2 + T3 + T4
-            // 5 tillers = T1 + T2 + T3 + T4 + T5
-            // 6 tillers = T1 + T2 + T3 + T4 + T5 + T6
-
-            // At leaf 5 fully expanded only initialize T1 with 2 leaves if present.
-
             int nTillers = (int)Math.Ceiling(CalculatedTillerNumber);
-            if (nTillers <= 0) return;
-
-            if (nTillers < 3) tillerOrder.Add(3);
-            if (nTillers == 2) tillerOrder.Add(4);
-            if (nTillers == 3)
-            {
-                tillerOrder.Add(2);
-                tillerOrder.Add(3);
-                tillerOrder.Add(4);
-            }
-            if (nTillers > 3)
-            {
-                for (int i = 1; i <= nTillers; i++)
-                {
-                    tillerOrder.Add(i);
-                }
-            }
 
             if (nTillers > 3)
             {
@@ -252,12 +224,12 @@ namespace Models.PMF.Struct
             // 4. there should be a tiller at that node. (Check tillerOrder)
 
             var tillersAdded = culms.Culms.Count - 1;
-            double lLAI = CalcLinearLAI();
+            linearLAI = TilleringCalculations.CalcLinearLAI(leaf, population, plantsPerMetre);
 
             if (newLeaf >= 5 &&
                 newLeaf > currentLeaf &&
                 CalculatedTillerNumber > tillersAdded &&
-                lLAI < maxLAIForTillerAddition.Value()
+                linearLAI < maxLAIForTillerAddition.Value()
             )
             {
                 // Axil = currentLeaf - 3
@@ -272,13 +244,6 @@ namespace Models.PMF.Struct
                     InitiateTiller(newNodeNumber, fractionToAdd, 1);
                 }
             }
-        }
-
-        private double CalcLinearLAI()
-        {
-            var tpla = (leaf.LAI + leaf.SenescedLai) / population * 10000; // Leaf area of one plant.
-            linearLAI = plantsPerMetre * tpla / 10000.0;
-            return linearLAI;
         }
 
         /// <summary>

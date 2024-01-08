@@ -1,116 +1,239 @@
-﻿//using APSIM.Shared.Utilities;
-//using Models.Functions;
-//using Models.PMF.Interfaces;
-//using Models.PMF.Phen;
-//using Models.PMF.Struct;
-//using System;
+﻿using Models.GrazPlan;
+using Models.Interfaces;
+using Models.PMF.Organs;
+using System;
+using System.Collections.Generic;
 
-//namespace Models.PMF
-//{
-//    /// <summary>Common Tillering Calculations</summary>
-//    public static class TilleringCalculations
-//    {
-//        private const int startThermalQuotientLeafNo = 3;
-//        private const int endThermalQuotientLeafNo = 5;
+namespace Models.PMF
+{
+    /// <summary>Common Tillering Calculations</summary>
+    public static class TilleringCalculations
+    {
+        /// <summary>The start of the period during which average PTQ is calculated</summary>
+        public const int START_THERMAL_QUOTIENT_LEAF_NO = 3;
 
-//        /// <summary> Calculate number of leaves</summary>
-//        public static double CalcLeafNumber(
-//            Plant plant,
-//            LeafCulms leafCulms,
-//            Phenology phenology,
-//            IFunction areaCalc,
-//            double calculatedTillerNumber,
-//            ref double radiationValues,
-//            ref double temperatureValues
-//        )
-//        {
-//            if (leafCulms.Culms?.Count == 0 ||
-//                !plant.IsEmerged)
-//            {
-//                return 0.0;
-//            }
+        /// <summary>The end of the period during which average PTQ is calculated</summary>
+        public const int END_THERMAL_QUOTIENT_LEAF_NO = 5;
 
-//            if (PhenologyHelper.BeforeEndJuvenileStage(phenology))
-//            {
-//                // ThermalTime Targets to EndJuv are not known until the end of the Juvenile Phase
-//                // FinalLeafNo is not known until the TT Target is known - meaning the potential leaf sizes aren't known
-//                leafCulms.Culms.ForEach(c => c.UpdatePotentialLeafSizes(areaCalc as ICulmLeafArea));
-//            }
+        /// <summary>Calculates the fertile tiller number when using the Rule Of Thumb tillering method</summary>
+        public static double CalculateFtnRuleOfThumb(
+            IClock clock,
+            Plant plant,
+            IWeather weather
+        )
+        {
+            // Estimate tillering given latitude, density, time of planting and
+            // row configuration. this will be replaced with dynamic
+            // calculations in the near future. Above latitude -25 is CQ, -25
+            // to -29 is SQ, below is NNSW.
+            double intercept, slope;
 
-//            var mainCulm = leafCulms.Culms[0];
-//            var existingLeafNo = (int)Math.Floor(mainCulm.CurrentLeafNo);
-//            var nLeaves = mainCulm.CurrentLeafNo;
-//            var dltLeafNoMainCulm = 0.0;
-//            leafCulms.dltLeafNo = dltLeafNoMainCulm;
+            if (weather.Latitude > -12.5 || weather.Latitude < -38.0)
+                // Unknown region.
+                throw new Exception("Unable to estimate number of tillers at latitude {weather.Latitude}");
 
-//            if (PhenologyHelper.BeforeStartOfGrainFillStage(phenology))
-//            {
-//                // Calculate the leaf apperance on the main culm.
-//                dltLeafNoMainCulm = CalcLeafAppearance(phenology, leafCulms, mainCulm);
+            if (weather.Latitude > -25.0)
+            {
+                // Central Queensland.
+                if (clock.Today.DayOfYear < 319 && clock.Today.DayOfYear > 182)
+                {
+                    // Between 1 July and 15 November.
+                    if (plant.SowingData.SkipRow > 1.9)
+                    {
+                        // Double (2.0).
+                        intercept = 0.5786; slope = -0.0521;
+                    }
+                    else if (plant.SowingData.SkipRow > 1.4)
+                    {
+                        // Single (1.5).
+                        intercept = 0.8786; slope = -0.0696;
+                    }
+                    else
+                    {
+                        // Solid (1.0).
+                        intercept = 1.1786; slope = -0.0871;
+                    }
+                }
+                else
+                {
+                    // After 15 November.
+                    if (plant.SowingData.SkipRow > 1.9)
+                    {
+                        // Double (2.0).
+                        intercept = 0.4786; slope = -0.0421;
+                    }
+                    else if (plant.SowingData.SkipRow > 1.4)
+                    {
+                        // Single (1.5)
+                        intercept = 0.6393; slope = -0.0486;
+                    }
+                    else
+                    {
+                        // Solid (1.0).
+                        intercept = 0.8000; slope = -0.0550;
+                    }
+                }
+            }
+            else if (weather.Latitude > -29.0)
+            {
+                // South Queensland.
+                if (clock.Today.DayOfYear < 319 && clock.Today.DayOfYear > 182)
+                {
+                    // Between 1 July and 15 November.
+                    if (plant.SowingData.SkipRow > 1.9)
+                    {
+                        // Double  (2.0).
+                        intercept = 1.1571; slope = -0.1043;
+                    }
+                    else if (plant.SowingData.SkipRow > 1.4)
+                    {
+                        // Single (1.5).
+                        intercept = 1.7571; slope = -0.1393;
+                    }
+                    else
+                    {
+                        // Solid (1.0).
+                        intercept = 2.3571; slope = -0.1743;
+                    }
+                }
+                else
+                {
+                    // After 15 November.
+                    if (plant.SowingData.SkipRow > 1.9)
+                    {
+                        // Double (2.0).
+                        intercept = 0.6786; slope = -0.0621;
+                    }
+                    else if (plant.SowingData.SkipRow > 1.4)
+                    {
+                        // Single (1.5).
+                        intercept = 1.1679; slope = -0.0957;
+                    }
+                    else
+                    {
+                        // Solid (1.0).
+                        intercept = 1.6571; slope = -0.1293;
+                    }
+                }
+            }
+            else
+            {
+                // Northern NSW.
+                if (clock.Today.DayOfYear < 319 && clock.Today.DayOfYear > 182)
+                {
+                    //  Between 1 July and 15 November.
+                    if (plant.SowingData.SkipRow > 1.9)
+                    {
+                        // Double (2.0).
+                        intercept = 1.3571; slope = -0.1243;
+                    }
+                    else if (plant.SowingData.SkipRow > 1.4)
+                    {
+                        // Single (1.5).
+                        intercept = 2.2357; slope = -0.1814;
+                    }
+                    else
+                    {
+                        // Solid (1.0).
+                        intercept = 3.1143; slope = -0.2386;
+                    }
+                }
+                else if (clock.Today.DayOfYear > 349 || clock.Today.DayOfYear < 182)
+                {
+                    // Between 15 December and 1 July.
+                    if (plant.SowingData.SkipRow > 1.9)
+                    {
+                        // Double (2.0).
+                        intercept = 0.4000; slope = -0.0400;
+                    }
+                    else if (plant.SowingData.SkipRow > 1.4)
+                    {
+                        // Single (1.5).
+                        intercept = 1.0571; slope = -0.0943;
+                    }
+                    else
+                    {
+                        // Solid (1.0).
+                        intercept = 1.7143; slope = -0.1486;
+                    }
+                }
+                else
+                {
+                    // Between 15 November and 15 December.
+                    if (plant.SowingData.SkipRow > 1.9)
+                    {
+                        // Double (2.0).
+                        intercept = 0.8786; slope = -0.0821;
+                    }
+                    else if (plant.SowingData.SkipRow > 1.4)
+                    {
+                        // Single (1.5).
+                        intercept = 1.6464; slope = -0.1379;
+                    }
+                    else
+                    {
+                        // Solid (1.0).
+                        intercept = 2.4143; slope = -0.1936;
+                    }
+                }
+            }
 
-//                // Now calculate the leaf apperance on all of the other culms.
-//                for (int i = 1; i < leafCulms.Culms.Count; i++)
-//                {
-//                    CalcLeafAppearance(
-//                        phenology, 
-//                        leafCulms, 
-//                        leafCulms.Culms[i]
-//                    );
-//                }
-//            }
+            return Math.Max(slope * plant.SowingData.Population + intercept, 0);
+        }
 
-//            var newLeafNo = (int)Math.Floor(mainCulm.CurrentLeafNo);
+        /// <summary>
+        /// Sets the order that tillers appear, according to the total tillers
+        /// Lafarge et al. (2002) reported a common hierarchy of tiller emergence of T3>T4>T2>T1>T5>T6 across diverse density treatments
+        /// 1 tiller  = T3 
+        /// 2 tillers = T3 + T4
+        /// 3 tillers = T2 + T3 + T4
+        /// 4 tillers = T1 + T2 + T3 + T4
+        /// 5 tillers = T1 + T2 + T3 + T4 + T5
+        /// 6 tillers = T1 + T2 + T3 + T4 + T5 + T6
+        /// </summary>
+        public static List<int> CalculateTillerOrder(
+            double calculatedTillerNumber
+        )
+        {
+            if (calculatedTillerNumber <= 0) return new();
 
-//            if (nLeaves > startThermalQuotientLeafNo)
-//            {
-//                CalcTillers(calculatedTillerNumber, newLeafNo, existingLeafNo);
-//                CalcTillerAppearance(newLeafNo, existingLeafNo);
-//            }
+            // At leaf 5 fully expanded only initialize T1 with 2 leaves if present.
 
-//            return dltLeafNoMainCulm;
-//        }
+            int nTillers = (int)Math.Ceiling(calculatedTillerNumber);
+            if (nTillers <= 0) return new();
 
-//        private void CalcTillers(
-//            double calculatedTillerNumber,
-//            int newLeaf, 
-//            int currentLeaf,
-//            ref double radiationValues,
-//            ref double temperatureValues
-//        )
-//        {
-//            if (CalculatedTillerNumber > 0.0) return;
+            List<int> calculatedTillerOrder = new();
 
-//            // Up to L5 FE store PTQ. At L5 FE calculate tiller number (endThermalQuotientLeafNo).
-//            // At L5 FE newLeaf = 6 and currentLeaf = 5
-//            if (newLeaf >= startThermalQuotientLeafNo && currentLeaf < endThermalQuotientLeafNo)
-//            {
-//                radiationValues += metData.Radn;
-//                temperatureValues += phenology.thermalTime.Value();
+            if (nTillers < 3) calculatedTillerOrder.Add(3);
+            if (nTillers == 2) calculatedTillerOrder.Add(4);
+            if (nTillers == 3)
+            {
+                calculatedTillerOrder.Add(2);
+                calculatedTillerOrder.Add(3);
+                calculatedTillerOrder.Add(4);
+            }
+            if (nTillers > 3)
+            {
+                for (int i = 1; i <= nTillers; i++)
+                {
+                    calculatedTillerOrder.Add(i);
+                }
+            }
 
-//                // L5 Fully Expanded
-//                if (newLeaf == endThermalQuotientLeafNo)
-//                {
-//                    double PTQ = radiationValues / temperatureValues;
-//                    CalcTillerNumber(PTQ);
-//                    AddInitialTillers();
-//                }
-//            }
-//        }
+            return calculatedTillerOrder;
+        }
 
-//        private static double CalcLeafAppearance(
-//            Phenology phenology,
-//            LeafCulms leafCulms, 
-//            Culm mainCulm
-//        )
-//        {
-//            var leavesRemaining = leafCulms.FinalLeafNo - mainCulm.CurrentLeafNo;
-//            var leafAppearanceRate = leafCulms.getLeafAppearanceRate(leavesRemaining);
-//            // if leaves are still growing, the cumulative number of phyllochrons or fully expanded leaves is calculated from thermal time for the day.
-//            var dltLeafNo = MathUtilities.Bound(MathUtilities.Divide(phenology.thermalTime.Value(), leafAppearanceRate, 0), 0.0, leavesRemaining);
-
-//            mainCulm.AddNewLeaf(dltLeafNo);
-
-//            return dltLeafNo;
-//        }
-//    }
-//}
+        /// <summary>Calculates the Linear LAI</summary>
+        public static double CalcLinearLAI(
+            SorghumLeaf leaf,
+            double population,
+            double plantsPerMetre
+        )
+        {
+            // Leaf area of one plant.
+            var tpla = (leaf.LAI + leaf.SenescedLai) / population * 10000;
+            var linearLAI = plantsPerMetre * tpla / 10000.0;
+            return linearLAI;
+        }
+    }
+}

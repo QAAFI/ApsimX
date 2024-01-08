@@ -1048,7 +1048,7 @@
                       "Specifications": [
                         "[SowingRule].Script.Cultivar = Buster",
                         "[SowingRule].Script.Density = 2",
-                        "[SowingRule].Script.Ftn = 4.5"
+                        "[SowingRule].Script.Ftn = 4.71"
                       ],
                       "Paths": null,
                       "Values": null,
@@ -1063,7 +1063,7 @@
                       "Specifications": [
                         "[SowingRule].Script.Cultivar = Buster",
                         "[SowingRule].Script.Density = 4",
-                        "[SowingRule].Script.Ftn = 3.27"
+                        "[SowingRule].Script.Ftn = 3.28"
                       ],
                       "Paths": null,
                       "Values": null,
@@ -1078,7 +1078,7 @@
                       "Specifications": [
                         "[SowingRule].Script.Cultivar = Buster",
                         "[SowingRule].Script.Density = 8",
-                        "[SowingRule].Script.Ftn = 1.53"
+                        "[SowingRule].Script.Ftn = 1.76"
                       ],
                       "Paths": null,
                       "Values": null,
@@ -1093,7 +1093,7 @@
                       "Specifications": [
                         "[SowingRule].Script.Cultivar = Buster",
                         "[SowingRule].Script.Density = 16",
-                        "[SowingRule].Script.Ftn = 0.2"
+                        "[SowingRule].Script.Ftn = 0.252"
                       ],
                       "Paths": null,
                       "Values": null,
