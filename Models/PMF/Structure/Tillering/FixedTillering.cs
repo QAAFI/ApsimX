@@ -97,8 +97,6 @@ namespace Models.PMF.Struct
         private bool isRuleOfThumbTilleringMethod = false;
         private List<int> tillerOrder = new();
 
-        private double GetDeltaDmGreen() { return leaf.potentialDMAllocation.Structural; }
-
         /// <summary> Calculate number of leaves</summary>
         public double CalcLeafNumber()
         {
@@ -121,12 +119,12 @@ namespace Models.PMF.Struct
             if (phenology.BeforeStartOfGrainFillStage())
             {
                 // Calculate the leaf apperance on the main culm.
-                dltLeafNoMainCulm = CalcLeafAppearance(mainCulm);
+                dltLeafNoMainCulm = TilleringCalculations.CalcLeafAppearance(phenology, culms, mainCulm);
 
                 // Now calculate the leaf apperance on all of the other culms.
                 for (int i = 1; i < culms.Culms.Count; i++)
                 {
-                    CalcLeafAppearance(culms.Culms[i]);
+                    TilleringCalculations.CalcLeafAppearance(phenology, culms, culms.Culms[i]);
                 }
             }
 
@@ -144,12 +142,7 @@ namespace Models.PMF.Struct
         /// <summary>Calculate the potential leaf area</summary>
         public double CalcPotentialLeafArea()
         {
-            culms.Culms.ForEach(c => c.DltLAI = 0);
-            if (phenology.BeforeFloweringStage())
-            {
-                return areaCalc.Value();
-            }
-            return 0.0;
+            return TilleringCalculations.CalcPotentialLeafArea(phenology, culms, areaCalc);
         }
 
         /// <summary> calculate the actual leaf area</summary>
@@ -157,40 +150,12 @@ namespace Models.PMF.Struct
         {
             var mainCulm = culms.Culms.FirstOrDefault();
 
-            double laiSlaReductionFraction = CalcCarbonLimitation(dltStressedLAI);
-            double leaf = mainCulm.CurrentLeafNo;
+            double laiSlaReductionFraction = TilleringCalculations.CalcCarbonLimitation(leaf, culms, dltStressedLAI);
             var dltLAI = Math.Max(dltStressedLAI * laiSlaReductionFraction, 0.0);
 
             culms.Culms.ForEach(c => c.TotalLAI += c.DltStressedLAI);
 
             return dltLAI;
-        }
-
-        /// <summary>
-        /// Calculate SLA for leafa rea including potential new growth - stressess effect
-        /// </summary>
-        /// <param name="stressedLAI"></param>
-        /// <returns></returns>
-        public double CalcCurrentSLA(double stressedLAI)
-        {
-            double dmGreen = leaf.Live.Wt;
-            double dltDmGreen = GetDeltaDmGreen();
-
-            if (dmGreen + dltDmGreen <= 0.0) return 0.0;
-
-            return (leaf.LAI + stressedLAI) / (dmGreen + dltDmGreen) * 10000; // (cm^2/g)
-        }
-
-        private double CalcLeafAppearance(Culm culm)
-        {
-            var leavesRemaining = culms.FinalLeafNo - culm.CurrentLeafNo;
-            var leafAppearanceRate = culms.getLeafAppearanceRate(leavesRemaining);
-            // if leaves are still growing, the cumulative number of phyllochrons or fully expanded leaves is calculated from thermal time for the day.
-            var dltLeafNo = MathUtilities.Bound(MathUtilities.Divide(phenology.thermalTime.Value(), leafAppearanceRate, 0), 0.0, leavesRemaining);
-
-            culm.AddNewLeaf(dltLeafNo);
-
-            return dltLeafNo;
         }
 
         private void CalcTillers(int newLeaf, int currentLeaf)
@@ -305,25 +270,6 @@ namespace Models.PMF.Struct
             };
             newCulm.UpdatePotentialLeafSizes(areaCalc as ICulmLeafArea);
             culms.Culms.Add(newCulm);
-        }
-
-        private double CalcCarbonLimitation(double dltStressedLAI)
-        {
-            double dltDmGreen = GetDeltaDmGreen();
-            if (dltDmGreen <= 0.001) return 1.0;
-
-            var mainCulm = culms.Culms[0];
-
-            // Changing to Reeves + 10%
-            double nLeaves = mainCulm.CurrentLeafNo;
-            double maxSLA;
-            maxSLA = 429.72 - 18.158 * (nLeaves);
-            maxSLA = Math.Min(400, maxSLA);
-            maxSLA = Math.Max(150, maxSLA);
-            var dltLaiPossible = dltDmGreen * maxSLA / 10000.0;
-
-            double fraction = Math.Min(dltStressedLAI > 0 ? (dltLaiPossible / dltStressedLAI) : 1.0, 1.0);
-            return fraction;
         }
 
         /// <summary> Reset Culms at start of the simulation </summary>

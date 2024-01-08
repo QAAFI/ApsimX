@@ -96,8 +96,6 @@ namespace Models.PMF.Struct
         private double temperatureValues = 0.0;
         private List<int> tillerOrder = new();
 
-        private double GetDeltaDmGreen() { return leaf.potentialDMAllocation.Structural; }
-
         /// <summary> Calculate number of leaves</summary>
         public double CalcLeafNumber()
         {
@@ -120,12 +118,12 @@ namespace Models.PMF.Struct
             if (phenology.BeforeStartOfGrainFillStage())
             {
                 // Calculate the leaf apperance on the main culm.
-                dltLeafNoMainCulm = CalcLeafAppearance(mainCulm);
+                dltLeafNoMainCulm = TilleringCalculations.CalcLeafAppearance(phenology, culms, mainCulm);
 
                 // Now calculate the leaf apperance on all of the other culms.
                 for (int i = 1; i < culms.Culms.Count; i++)
                 {
-                    CalcLeafAppearance(culms.Culms[i]);
+                    TilleringCalculations.CalcLeafAppearance(phenology, culms, culms.Culms[i]);
                 }
             }
 
@@ -140,16 +138,45 @@ namespace Models.PMF.Struct
             return dltLeafNoMainCulm;
         }
 
-        private double CalcLeafAppearance(Culm culm)
+        /// <summary>Calculate the potential leaf area</summary>
+        public double CalcPotentialLeafArea()
         {
-            var leavesRemaining = culms.FinalLeafNo - culm.CurrentLeafNo;
-            var leafAppearanceRate = culms.getLeafAppearanceRate(leavesRemaining);
-            // if leaves are still growing, the cumulative number of phyllochrons or fully expanded leaves is calculated from thermal time for the day.
-            var dltLeafNo = MathUtilities.Bound(MathUtilities.Divide(phenology.thermalTime.Value(), leafAppearanceRate, 0), 0.0, leavesRemaining);
+            return TilleringCalculations.CalcPotentialLeafArea(phenology, culms, areaCalc);
+        }
 
-            culm.AddNewLeaf(dltLeafNo);
+        /// <summary>Calculate the actual leaf area</summary>
+        public double CalcActualLeafArea(double dltStressedLAI)
+        {
+            var mainCulm = culms.Culms.FirstOrDefault();
 
-            return dltLeafNo;
+            if (mainCulm != null &&
+                phenology.AfterEndJuvenileStage() &&
+                CalculatedTillerNumber > 0.0 &&
+                mainCulm.CurrentLeafNo < mainCulm.PositionOfLargestLeaf
+            )
+            {
+                CalculateTillerCessation(dltStressedLAI);
+            }
+
+            // recalculate todays LAI
+            var dltStressedLAI2 = 0.0;
+            foreach (var culm in culms.Culms)
+            {
+                dltStressedLAI2 += culm.DltLAI;
+            }
+
+            double laiSlaReductionFraction = TilleringCalculations.CalcCarbonLimitation(leaf, culms, dltStressedLAI2);
+            var dltLAI = Math.Max(dltStressedLAI2 * laiSlaReductionFraction, 0.0);
+
+            // Apply to each culm
+            if (laiSlaReductionFraction < 1.0)
+            {
+                ReduceAllTillersProportionately(laiSlaReductionFraction);
+            }
+
+            culms.Culms.ForEach(c => c.TotalLAI += c.DltStressedLAI);
+
+            return dltLAI;
         }
 
         private void CalcTillers(int newLeaf, int currentLeaf)
@@ -249,7 +276,7 @@ namespace Models.PMF.Struct
         /// <summary>
         /// Add a tiller.
         /// </summary>
-        void InitiateTiller(int tillerNumber, double fractionToAdd, double initialLeaf)
+        private void InitiateTiller(int tillerNumber, double fractionToAdd, double initialLeaf)
         {
             double leafNoAtAppearance = 1.0;
             Culm newCulm = new(leafNoAtAppearance)
@@ -262,51 +289,6 @@ namespace Models.PMF.Struct
             };
             newCulm.UpdatePotentialLeafSizes(areaCalc as ICulmLeafArea);
             culms.Culms.Add(newCulm);
-        }
-
-        /// <summary>Calculate the potential leaf area</summary>
-        public double CalcPotentialLeafArea()
-        {
-            culms.Culms.ForEach(c => c.DltLAI = 0);
-            if (phenology.BeforeFloweringStage())
-            {
-                return areaCalc.Value();
-            }
-            return 0.0;
-        }
-
-        /// <summary> calculate the actual leaf area</summary>
-        public double CalcActualLeafArea(double dltStressedLAI)
-        {
-            var mainCulm = culms.Culms.FirstOrDefault();
-
-            if (mainCulm != null &&
-                phenology.AfterEndJuvenileStage() &&
-                CalculatedTillerNumber > 0.0 &&
-                mainCulm.CurrentLeafNo < mainCulm.PositionOfLargestLeaf
-            )
-            {
-                CalculateTillerCessation(dltStressedLAI);
-            }
-
-            // recalculate todays LAI
-            var dltStressedLAI2 = 0.0;
-            foreach (var culm in culms.Culms)
-                dltStressedLAI2 += culm.DltLAI;
-
-            double laiSlaReductionFraction = CalcCarbonLimitation(dltStressedLAI2);
-            double leaf = mainCulm.CurrentLeafNo;
-            var dltLAI = Math.Max(dltStressedLAI2 * laiSlaReductionFraction, 0.0);
-
-            // Apply to each culm
-            if (laiSlaReductionFraction < 1.0)
-            {
-                ReduceAllTillersProportionately(laiSlaReductionFraction);
-            }
-
-            culms.Culms.ForEach(c => c.TotalLAI += c.DltStressedLAI);
-
-            return dltLAI;
         }
 
         private void CalculateTillerCessation(double dltStressedLAI)
@@ -352,7 +334,8 @@ namespace Models.PMF.Struct
                 if (!(tillerLaiLeftToReduce > 0) || accProportion >= maxTillerLoss) break;
             }
             CurrentTillerNumber = 0;
-            culms.Culms.ForEach(c => CurrentTillerNumber += c.Proportion); CurrentTillerNumber-=1;
+            culms.Culms.ForEach(c => CurrentTillerNumber += c.Proportion); 
+            CurrentTillerNumber -=1;
 
         }
 
@@ -370,7 +353,7 @@ namespace Models.PMF.Struct
             maxSLA = Math.Max(150, maxSLA);
 
             double dmGreen = leaf.Live.Wt;
-            double dltDmGreen = GetDeltaDmGreen();
+            double dltDmGreen = leaf.potentialDMAllocation.Structural;
 
             // Calc how much LAI we need to remove to get back to the SLA target line.
             // This is done by reducing the proportion of tiller area.
@@ -378,41 +361,7 @@ namespace Models.PMF.Struct
             return Math.Max(leaf.LAI + dltStressedLAI - maxLaiTarget, 0);
         }
 
-        private double CalcCarbonLimitation(double dltStressedLAI)
-        {
-            double dltDmGreen = GetDeltaDmGreen();
-            if (dltDmGreen <= 0.001) return 1.0;
-
-            var mainCulm = culms.Culms[0];
-
-            // Changing to Reeves + 10%
-            double nLeaves = mainCulm.CurrentLeafNo;
-            double maxSLA;
-            maxSLA = 429.72 - 18.158 * (nLeaves);            
-            maxSLA = Math.Min(400, maxSLA);
-            maxSLA = Math.Max(150, maxSLA);
-            var dltLaiPossible = dltDmGreen * maxSLA / 10000.0;
-
-            double fraction = Math.Min(dltStressedLAI > 0 ? (dltLaiPossible / dltStressedLAI) : 1.0, 1.0);
-            return fraction;
-        }
-
-        /// <summary>
-        /// Calculate SLA for leafa rea including potential new growth - stressess effect
-        /// </summary>
-        /// <param name="stressedLAI"></param>
-        /// <returns></returns>
-        public double CalcCurrentSLA(double stressedLAI)
-        {
-            double dmGreen = leaf.Live.Wt;
-            double dltDmGreen = GetDeltaDmGreen();
-
-            if (dmGreen + dltDmGreen <= 0.0) return 0.0;
-
-            return (leaf.LAI + stressedLAI) / (dmGreen + dltDmGreen) * 10000; // (cm^2/g)
-        }
-
-        void ReduceAllTillersProportionately(double laiReduction)
+        private void ReduceAllTillersProportionately(double laiReduction)
         {
             if (laiReduction <= 0.0) return;
 

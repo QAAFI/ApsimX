@@ -1,8 +1,12 @@
-﻿using Models.GrazPlan;
+﻿using APSIM.Shared.Utilities;
+using Models.Functions;
 using Models.Interfaces;
 using Models.PMF.Organs;
+using Models.PMF.Phen;
+using Models.PMF.Struct;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Models.PMF
 {
@@ -234,6 +238,77 @@ namespace Models.PMF
             var tpla = (leaf.LAI + leaf.SenescedLai) / population * 10000;
             var linearLAI = plantsPerMetre * tpla / 10000.0;
             return linearLAI;
+        }
+
+        /// <summary>Calculate SLA for leafa rea including potential new growth - stressess effect</summary>
+        public static double CalcCurrentSLA(
+            SorghumLeaf leaf,
+            double stressedLAI
+        )
+        {
+            double dmGreen = leaf.Live.Wt;
+            double dltDmGreen = leaf.potentialDMAllocation.Structural;
+
+            if (dmGreen + dltDmGreen <= 0.0) return 0.0;
+
+            // (cm^2/g)
+            return (leaf.LAI + stressedLAI) / (dmGreen + dltDmGreen) * 10000;
+        }
+
+        /// <summary>Calculates the carbon limitation.</summary>
+        public static double CalcCarbonLimitation(
+            SorghumLeaf leaf,
+            LeafCulms leafCulms,
+            double dltStressedLAI
+        )
+        {
+            double dltDmGreen = leaf.potentialDMAllocation.Structural;
+            if (dltDmGreen <= 0.001) return 1.0;
+
+            var mainCulm = leafCulms.Culms[0];
+
+            // Changing to Reeves + 10%
+            double nLeaves = mainCulm.CurrentLeafNo;
+            double maxSLA;
+            maxSLA = 429.72 - 18.158 * (nLeaves);
+            maxSLA = Math.Min(400, maxSLA);
+            maxSLA = Math.Max(150, maxSLA);
+            var dltLaiPossible = dltDmGreen * maxSLA / 10000.0;
+
+            double fraction = Math.Min(dltStressedLAI > 0 ? (dltLaiPossible / dltStressedLAI) : 1.0, 1.0);
+            return fraction;
+        }
+
+        /// <summary>Calculates the leaf appearance.</summary>
+        public static double CalcLeafAppearance(
+            Phenology phenology,
+            LeafCulms leafCulms,
+            Culm culm
+        )
+        {
+            var leavesRemaining = leafCulms.FinalLeafNo - culm.CurrentLeafNo;
+            var leafAppearanceRate = leafCulms.getLeafAppearanceRate(leavesRemaining);
+            // If leaves are still growing, the cumulative number of phyllochrons or fully expanded leaves is calculated from thermal time for the day.
+            var dltLeafNo = MathUtilities.Bound(MathUtilities.Divide(phenology.thermalTime.Value(), leafAppearanceRate, 0), 0.0, leavesRemaining);
+
+            culm.AddNewLeaf(dltLeafNo);
+
+            return dltLeafNo;
+        }
+
+        /// <summary>Calculates the potential leaf area.</summary>
+        public static double CalcPotentialLeafArea(
+            Phenology phenology,
+            LeafCulms leafCulms,
+            IFunction areaCalc
+        )
+        {
+            leafCulms.Culms.ForEach(c => c.DltLAI = 0);
+            if (phenology.BeforeFloweringStage())
+            {
+                return areaCalc.Value();
+            }
+            return 0.0;
         }
     }
 }
