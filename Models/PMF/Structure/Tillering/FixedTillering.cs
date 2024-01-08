@@ -5,11 +5,10 @@ using Models.Interfaces;
 using Models.PMF.Interfaces;
 using Models.PMF.Organs;
 using Models.PMF.Phen;
-using Models.Utilities;
-using System;
-using System.Linq;
 using Newtonsoft.Json;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Models.PMF.Struct
 {
@@ -22,415 +21,385 @@ namespace Models.PMF.Struct
     [ValidParent(ParentType = typeof(LeafCulms))]
     public class FixedTillering : Model, ITilleringMethod
     {
-		/// <summary>The parent Plant</summary>
-		[Link]
-		Plant plant = null;
-
-		/// <summary>
-        /// Link to clock (used for FTN calculations at time of sowing).
-        /// </summary>
+        /// <summary>The parent Plant</summary>
         [Link]
-		private IClock clock = null;
+        Plant plant = null;
 
-		/// <summary>
-		/// Link to weather.
-		/// </summary>
-		[Link]
-		private IWeather weather = null;
+        /// <summary> Culms on the leaf </summary>
+        [Link]
+        public LeafCulms culms = null;
 
-		/// <summary> Culms on the leaf </summary>
-		[Link]
-		LeafCulms culms = null;
+        /// <summary>The parent tilering class</summary>
+        [Link]
+        Phenology phenology = null;
 
-		/// <summary> Leaf organ</summary>
-		[Link]
-		SorghumLeaf leaf = null;
+        /// <summary>The parent tilering class</summary>
+        [Link]
+        SorghumLeaf leaf = null;
 
-		/// <summary> Culms on the leaf </summary>
-		[Link(Type = LinkType.Child, ByName = true)]
-		IFunction areaCalc = null;
+        /// <summary>The met data</summary>
+        [Link]
+        private IWeather metData = null;
 
-		/// <summary> Culms on the leaf </summary>
-		[Link(Type = LinkType.Child, ByName = true)]
-		IFunction slaMax = null;
+        /// <summary> Culms on the leaf </summary>
+        [Link(Type = LinkType.Child, ByName = true)]
+        IFunction areaCalc = null;
 
-		/// <summary>The parent tilering class</summary>
-		[Link]
-		Phenology phenology = null;
+        /// <summary> Propoensity to Tiller Intercept </summary>
+        [Link(Type = LinkType.Child, ByName = true)]
+        IFunction tillerSdIntercept = null;
 
-        /// <summary>Number of Fertile Tillers at Harvest</summary>
+        /// <summary> Propsenity to Tiller Slope </summary>
+        [Link(Type = LinkType.Child, ByName = true)]
+        IFunction tillerSdSlope = null;
+
+        /// <summary> LAI Value where tillers are no longer added </summary>
+        [Link(Type = LinkType.Child, ByName = true)]
+        IFunction maxLAIForTillerAddition = null;
+
+        /// <summary>Number of potential Fertile Tillers at harvest</summary>
         [JsonIgnore]
-        public double FertileTillerNumber { get; set; }
+        public double CalculatedTillerNumber { get; set; }
 
         /// <summary>Current Number of Tillers</summary>
         [JsonIgnore]
         public double CurrentTillerNumber { get; set; }
 
-		/// <summary>Current Number of Tillers</summary>
-		[JsonIgnore]
-		public double CalculatedTillerNumber { get; set; } = 0.0;
+        /// <summary>Current Number of Tillers</summary>
+        [JsonIgnore]
+        public double DltTillerNumber { get; set; }
 
-        private int floweringStage;
-		private int endJuvenilePhase;
-		private int dayOfClassicsEmergence = -1;
-
-        private bool beforeFlowering()
-{
-			if (floweringStage < 1) floweringStage = phenology.EndStagePhaseIndex("Flowering");
-			return phenology.BeforePhase(floweringStage);
-		}
-		private bool beforeEndJuvenileStage()
-		{
-			if (endJuvenilePhase < 1) endJuvenilePhase = phenology.StartStagePhaseIndex("EndJuvenile");
-			return phenology.BeforePhase(endJuvenilePhase);
-		}
-
-		/// <summary> Calculate number of leaves</summary>
-		public double CalcLeafNumber()
+        /// <summary>Actual Number of Fertile Tillers</summary>
+        [JsonIgnore]
+        public double FertileTillerNumber
         {
-			if (culms.Culms?.Count == 0) return 0.0;
-			if (!plant.IsEmerged) return 0.0;
-			if (dayOfClassicsEmergence == -1)
-			{
-				//classic had a delay due to emergence being set to a whole number (3) at emergence
-				//this created a slight offset where the calculated day of emergence is 1 day earlier in NextGen
-				//In Classic, the leaf calc would then start at 1 on the day after emergence - which creates a 2 day difference that becomes significant
-				//so leave the leafNo at 1 on the day after emergence
-				dayOfClassicsEmergence = 0; //When it runs tomorrow it will be the day of ermergence
-				return 1.0;
-			}
-			//if (dayOfClassicsEmergence == 0)
-			//{
-			//	dayOfClassicsEmergence = 1;
-			//	return 1.0;
-			//}
-			var currentLeafNo = culms.Culms[0].CurrentLeafNo;
-			double dltLeafNoMainCulm = 0.0;
-			if (beforeEndJuvenileStage())
-			{
-				//ThermalTime Targets to EndJuv are not known until the end of the Juvenile Phase
-				//FinalLeafNo is not known until the TT Target is known - meaning the potential leaf sizes aren't known
-				culms.Culms.ForEach(c => c.UpdatePotentialLeafSizes(areaCalc as ICulmLeafArea));
-			}
-
-			dltLeafNoMainCulm = calcLeafAppearance(culms.Culms[0]);
-			culms.dltLeafNo = dltLeafNoMainCulm;
-			double newLeafNo = culms.Culms[0].CurrentLeafNo;
-
-			//should there be any growth after flowering?
-			calcTillerAppearance((int)Math.Floor(newLeafNo), (int)Math.Floor(currentLeafNo));
-
-			for (int i = 1; i < culms.Culms.Count; i++)
-			{
-				calcLeafAppearance(culms.Culms[i]);
-			}
-			return dltLeafNoMainCulm;
+            get => CurrentTillerNumber;
+            set { throw new Exception("Cannot set the FertileTillerNumber for Dynamic Tillering. Make sure you set TilleringMethod before FertileTillerNmber"); }
         }
 
-		/// <summary> Calculate the potential leaf area for the tillers</summary>
-		public double CalcPotentialLeafArea()
+        /// <summary>Supply Demand Ratio used to calculate Tiller No</summary>
+        [JsonIgnore]
+        public double SupplyDemandRatio { get; private set; }
+
+        private const int startThermalQuotientLeafNo = 3;
+        private const int endThermalQuotientLeafNo = 5;
+        private double specifiedFertileTillerNumber = 0.0;
+        private double plantsPerMetre;
+        private double population;
+        private double linearLAI;
+        private double radiationValues = 0.0;
+        private double temperatureValues = 0.0;
+        private readonly List<int> tillerOrder = new();
+
+        private double GetDeltaDmGreen() { return leaf.potentialDMAllocation.Structural; }
+
+        /// <summary> Calculate number of leaves</summary>
+        public double CalcLeafNumber()
         {
-			//if(beforeFlowering())
-				return areaCalc.Value();
-			//return 0.0;
-		}
+            if (culms.Culms?.Count == 0) return 0.0;
+            if (!plant.IsEmerged) return 0.0;
 
-		/// <summary> Calculate actual area - which is constrained by the SLA of the leaf</summary>
-		public double CalcActualLeafArea(double dltStressedLAI)
-		{
-			if (beforeEndJuvenileStage()) return dltStressedLAI;
+            if (phenology.BeforeEndJuvenileStage())
+            {
+                // ThermalTime Targets to EndJuv are not known until the end of the Juvenile Phase
+                // FinalLeafNo is not known until the TT Target is known - meaning the potential leaf sizes aren't known
+                culms.Culms.ForEach(c => c.UpdatePotentialLeafSizes(areaCalc as ICulmLeafArea));
+            }
 
-			double dltDmGreen = leaf.potentialDMAllocation.Structural;
-			if (dltDmGreen <= 0.0) return dltStressedLAI;
+            var mainCulm = culms.Culms[0];
+            var existingLeafNo = (int)Math.Floor(mainCulm.CurrentLeafNo);
+            var nLeaves = mainCulm.CurrentLeafNo;
+            var dltLeafNoMainCulm = 0.0;
+            culms.dltLeafNo = dltLeafNoMainCulm;
 
-			return Math.Min(dltStressedLAI, dltDmGreen * slaMax.Value().ConvertSqM2SqMM());
-		}
+            if (phenology.BeforeStartOfGrainFillStage())
+            {
+                // Calculate the leaf apperance on the main culm.
+                dltLeafNoMainCulm = CalcLeafAppearance(mainCulm);
 
-		private double calcLeafAppearance(Culm culm)
-		{
-			var leavesRemaining = Math.Max(0.0, culms.FinalLeafNo - culm.LeafNoAtAppearance - culm.CurrentLeafNo);
-			var leafAppearanceRate = culms.getLeafAppearanceRate(leavesRemaining);
-			// if leaves are still growing, the cumulative number of phyllochrons or fully expanded leaves is calculated from thermal time for the day.
-			var dltLeafNo = MathUtilities.Bound(MathUtilities.Divide(phenology.thermalTime.Value(), leafAppearanceRate, 0), 0.0, leavesRemaining);
+                // Now calculate the leaf apperance on all of the other culms.
+                for (int i = 1; i < culms.Culms.Count; i++)
+                {
+                    CalcLeafAppearance(culms.Culms[i]);
+                }
+            }
 
-			// In sorghum, this is added to current leafno immediately. In
-			// maize, this doesn't happen until end of day.
-			culm.AddNewLeaf(dltLeafNo);
+            var newLeafNo = (int)Math.Floor(mainCulm.CurrentLeafNo);
 
-			return dltLeafNo;
-		}
+            if (nLeaves > startThermalQuotientLeafNo)
+            {
+                CalcTillers(newLeafNo, existingLeafNo);
+                CalcTillerAppearance(newLeafNo, existingLeafNo);
+            }
 
-		void calcTillerAppearance(int newLeafNo, int currentLeafNo)
-		{
-			if (newLeafNo <= currentLeafNo) return;
-			if (newLeafNo < 3) return; //don't add before leaf 3
+            return dltLeafNoMainCulm;
+        }
 
-			//if there are still more tillers to add and the newleaf is greater than 3
-			if (CurrentTillerNumber >= FertileTillerNumber) return;
+        private double CalcLeafAppearance(Culm culm)
+        {
+            var leavesRemaining = culms.FinalLeafNo - culm.CurrentLeafNo;
+            var leafAppearanceRate = culms.getLeafAppearanceRate(leavesRemaining);
+            // if leaves are still growing, the cumulative number of phyllochrons or fully expanded leaves is calculated from thermal time for the day.
+            var dltLeafNo = MathUtilities.Bound(MathUtilities.Divide(phenology.thermalTime.Value(), leafAppearanceRate, 0), 0.0, leavesRemaining);
 
-			//tiller emergence is more closely aligned with tip apearance, but we don't track tip, so will use ligule appearance
-			//could also use Thermal Time calcs if needed
-			//Environmental & Genotypic Control of Tillering in Sorghum ppt - Hae Koo Kim
-			//T2=L3, T3=L4, T4=L5, T5=L6
+            culm.AddNewLeaf(dltLeafNo);
 
-			//logic to add new tillers depends on which tiller, which is defined by FTN (fertileTillerNo)
-			//this should be provided at sowing
-			//2 tillers = T3 + T4
-			//3 tillers = T2 + T3 + T4
-			//4 tillers = T2 + T3 + T4 + T5
-			//more than that is too many tillers - but will assume existing pattern for 3 and 4
-			//5 tillers = T2 + T3 + T4 + T5 + T6
+            return dltLeafNo;
+        }
 
-			double leafAppearance = culms.Culms.Count + 2; //first culm added will equal 3
-			double fraction = 1.0;
+        private void CalcTillers(int newLeaf, int currentLeaf)
+        {
+            if (CalculatedTillerNumber > 0.0) return;
 
-			if (FertileTillerNumber > 2 && FertileTillerNumber < 3 && leafAppearance < 4)
-			{
-				fraction = FertileTillerNumber % 1;
-			}
-			else
-			{
-				if (FertileTillerNumber - CurrentTillerNumber < 1)
-					fraction = FertileTillerNumber - CurrentTillerNumber;
-			}
-			AddTiller(leafAppearance, currentLeafNo, fraction);
-		}
-		/// <summary>
-		/// Add a tiller.
-		/// </summary>
-		/// <param name="leafAtAppearance"></param>
-		/// <param name="Leaves"></param>
-		/// <param name="fractionToAdd"></param>
-		private void AddTiller(double leafAtAppearance, double Leaves, double fractionToAdd)
-		{
-			double fraction = 1;
-			if (FertileTillerNumber - CurrentTillerNumber < 1)
-				fraction = FertileTillerNumber - CurrentTillerNumber;
+            // Up to L5 FE store PTQ. At L5 FE calculate tiller number (endThermalQuotientLeafNo).
+            // At L5 FE newLeaf = 6 and currentLeaf = 5
+            if (newLeaf >= startThermalQuotientLeafNo && currentLeaf < endThermalQuotientLeafNo)
+            {
+                radiationValues += metData.Radn;
+                temperatureValues += phenology.thermalTime.Value();
 
-			// get number of tillers
-			// add fractionToAdd
-			// if new tiller is neded add one
-			// fraction goes to proportions
-			double tillerFraction = culms.Culms.Last().Proportion;
-			//tillerFraction +=fractionToAdd;
-			fraction = tillerFraction + fractionToAdd - Math.Floor(tillerFraction);
-			//a new tiller is created with each new leaf, up the number of fertileTillers
-			if (tillerFraction + fractionToAdd > 1)
-			{
-				Culm newCulm = new Culm(leafAtAppearance);
+                // L5 Fully Expanded
+                if (newLeaf == endThermalQuotientLeafNo)
+                {
+                    double PTQ = radiationValues / temperatureValues;
+                    CalcTillerNumber(PTQ);
+                    AddInitialTillers();
+                }
+            }
+        }
 
-				//bell curve distribution is adjusted horizontally by moving the curve to the left.
-				//This will cause the first leaf to have the same value as the nth leaf on the main culm.
-				//T3&T4 were defined during dicussion at initial tillering meeting 27/06/12
-				//all others are an assumption
-				//T2 = 3 Leaves
-				//T3 = 4 Leaves
-				//T4 = 5 leaves
-				//T5 = 6 leaves
-				//T6 = 7 leaves
-				newCulm.CulmNo = culms.Culms.Count;
-				newCulm.CurrentLeafNo = newCulm.CulmNo + 2;
+        private void CalcTillerNumber(double PTQ)
+        {
+            // The final tiller number (Ftn) is calculated after the full appearance of LeafNo 5 - when leaf 6 emerges.
+            // Calc Supply = R/oCd * LA5 * Phy5
+            var areaMethod = areaCalc as ICulmLeafArea;
+            var mainCulm = culms.Culms[0];
+            double L5Area = areaMethod.CalculateIndividualLeafArea(5, mainCulm);
+            double L9Area = areaMethod.CalculateIndividualLeafArea(9, mainCulm);
 
-                newCulm.VertAdjValue = culms.MaxVerticalTillerAdjustment.Value() + (CurrentTillerNumber * culms.VerticalTillerAdjustment.Value());
-				newCulm.Proportion = fraction;
-				newCulm.FinalLeafNo = culms.Culms[0].FinalLeafNo;
-				//newCulm.calcLeafAppearance();
-				newCulm.UpdatePotentialLeafSizes(areaCalc as ICulmLeafArea);
-				calcLeafAppearance(newCulm);
-				//newCulm.calculateLeafSizes();
-				culms.Culms.Add(newCulm);
-			}
-			else
-			{
-				culms.Culms.Last().Proportion = fraction;
-			}
-            CurrentTillerNumber += fractionToAdd;
-		}
+            double Phy5 = culms.getLeafAppearanceRate(culms.FinalLeafNo - culms.Culms[0].CurrentLeafNo);
+
+            // Calc Demand = LA9 - LA5
+            var demand = L9Area - L5Area;
+            var supply = PTQ * L5Area * Phy5;
+            SupplyDemandRatio = MathUtilities.Divide(supply, demand, 0);
+
+            var calculatedTillerNumber = tillerSdIntercept.Value() + tillerSdSlope.Value() * SupplyDemandRatio;
+
+            CalculatedTillerNumber = Math.Max(
+                Math.Min(specifiedFertileTillerNumber, calculatedTillerNumber),
+                0.0
+            );
+        }
+
+        void AddInitialTillers()
+        {
+            tillerOrder.Clear();
+
+            if (CalculatedTillerNumber <= 0) return;
+
+            // Lafarge et al. (2002) reported a common hierarchy of tiller emergence of T3>T4>T2>T1>T5>T6 across diverse density treatments
+            // 1 tiller  = T3 
+            // 2 tillers = T3 + T4
+            // 3 tillers = T2 + T3 + T4
+            // 4 tillers = T1 + T2 + T3 + T4
+            // 5 tillers = T1 + T2 + T3 + T4 + T5
+            // 6 tillers = T1 + T2 + T3 + T4 + T5 + T6
+
+            // At leaf 5 fully expanded only initialize T1 with 2 leaves if present.
+
+            int nTillers = (int)Math.Ceiling(CalculatedTillerNumber);
+            if (nTillers <= 0) return;
+
+            if (nTillers < 3) tillerOrder.Add(3);
+            if (nTillers == 2) tillerOrder.Add(4);
+            if (nTillers == 3)
+            {
+                tillerOrder.Add(2);
+                tillerOrder.Add(3);
+                tillerOrder.Add(4);
+            }
+            if (nTillers > 3)
+            {
+                for (int i = 1; i <= nTillers; i++)
+                {
+                    tillerOrder.Add(i);
+                }
+            }
+
+            if (nTillers > 3)
+            {
+                InitiateTiller(1, 1, 2);
+                CurrentTillerNumber = 1;
+            }
+        }
+
+        private void CalcTillerAppearance(int newLeaf, int currentLeaf)
+        {
+            // Each time a leaf becomes fully expanded starting at 5 see if a tiller should be initiated.
+            // When a leaf is fully expanded a tiller can be initiated at the axil 3 leaves less
+            // So at L5 FE (newLeaf = 6, currentLeaf = 5) a Tiller might be at axil 2. i.e. a T2 
+
+            // Add any new tillers and then calc each tiller in turn. Add a tiller if:
+            // 1. There are more tillers to add.
+            // 2. linearLAI < maxLAIForTillerAddition
+            // 3. A leaf has fully expanded.  (newLeaf >= 6, newLeaf > currentLeaf)
+            // 4. there should be a tiller at that node. (Check tillerOrder)
+
+            var tillersAdded = culms.Culms.Count - 1;
+            double lLAI = CalcLinearLAI();
+
+            if (newLeaf >= 5 &&
+                newLeaf > currentLeaf &&
+                CalculatedTillerNumber > tillersAdded &&
+                lLAI < maxLAIForTillerAddition.Value()
+            )
+            {
+                // Axil = currentLeaf - 3
+                int newNodeNumber = newLeaf - 3;
+                if (tillerOrder.Contains(newNodeNumber))
+                {
+                    var fractionToAdd = Math.Min(1.0, CalculatedTillerNumber - tillersAdded);
+
+                    DltTillerNumber = fractionToAdd;
+                    CurrentTillerNumber += fractionToAdd;
+
+                    InitiateTiller(newNodeNumber, fractionToAdd, 1);
+                }
+            }
+        }
+
+        private double CalcLinearLAI()
+        {
+            var tpla = (leaf.LAI + leaf.SenescedLai) / population * 10000; // Leaf area of one plant.
+            linearLAI = plantsPerMetre * tpla / 10000.0;
+            return linearLAI;
+        }
+
+        /// <summary>
+        /// Add a tiller.
+        /// </summary>
+        void InitiateTiller(int tillerNumber, double fractionToAdd, double initialLeaf)
+        {
+            double leafNoAtAppearance = 1.0;
+            Culm newCulm = new(leafNoAtAppearance)
+            {
+                CulmNo = tillerNumber,
+                CurrentLeafNo = initialLeaf,
+                VertAdjValue = culms.MaxVerticalTillerAdjustment.Value() + (CurrentTillerNumber * culms.VerticalTillerAdjustment.Value()),
+                Proportion = fractionToAdd,
+                FinalLeafNo = culms.Culms[0].FinalLeafNo
+            };
+            newCulm.UpdatePotentialLeafSizes(areaCalc as ICulmLeafArea);
+            culms.Culms.Add(newCulm);
+        }
+
+        /// <summary>Calculate the potential leaf area</summary>
+        public double CalcPotentialLeafArea()
+        {
+            culms.Culms.ForEach(c => c.DltLAI = 0);
+            if (phenology.BeforeFloweringStage())
+            {
+                return areaCalc.Value();
+            }
+            return 0.0;
+        }
+
+        /// <summary> calculate the actual leaf area</summary>
+        public double CalcActualLeafArea(double dltStressedLAI)
+        {
+            var mainCulm = culms.Culms.FirstOrDefault();
+
+            if (mainCulm != null &&
+                phenology.AfterEndJuvenileStage() &&
+                CalculatedTillerNumber > 0.0 &&
+                mainCulm.CurrentLeafNo < mainCulm.PositionOfLargestLeaf
+            )
+            {
+                //CalculateTillerCessation(dltStressedLAI);
+            }
+
+            // recalculate todays LAI
+            var dltStressedLAI2 = 0.0;
+            foreach (var culm in culms.Culms)
+                dltStressedLAI2 += culm.DltLAI;
+
+            double laiSlaReductionFraction = CalcCarbonLimitation(dltStressedLAI2);
+            double leaf = mainCulm.CurrentLeafNo;
+            var dltLAI = Math.Max(dltStressedLAI2 * laiSlaReductionFraction, 0.0);
+
+            // Apply to each culm
+            if (laiSlaReductionFraction < 1.0)
+            {
+                //ReduceAllTillersProportionately(laiSlaReductionFraction);
+            }
+
+            culms.Culms.ForEach(c => c.TotalLAI += c.DltStressedLAI);
+
+            return dltLAI;
+        }
+
+        private double CalcCarbonLimitation(double dltStressedLAI)
+        {
+            double dltDmGreen = GetDeltaDmGreen();
+            if (dltDmGreen <= 0.001) return 1.0;
+
+            var mainCulm = culms.Culms[0];
+
+            // Changing to Reeves + 10%
+            double nLeaves = mainCulm.CurrentLeafNo;
+            double maxSLA;
+            maxSLA = 429.72 - 18.158 * (nLeaves);
+            maxSLA = Math.Min(400, maxSLA);
+            maxSLA = Math.Max(150, maxSLA);
+            var dltLaiPossible = dltDmGreen * maxSLA / 10000.0;
+
+            double fraction = Math.Min(dltStressedLAI > 0 ? (dltLaiPossible / dltStressedLAI) : 1.0, 1.0);
+            return fraction;
+        }
+
+        /// <summary>
+        /// Calculate SLA for leafa rea including potential new growth - stressess effect
+        /// </summary>
+        /// <param name="stressedLAI"></param>
+        /// <returns></returns>
+        public double CalcCurrentSLA(double stressedLAI)
+        {
+            double dmGreen = leaf.Live.Wt;
+            double dltDmGreen = GetDeltaDmGreen();
+
+            if (dmGreen + dltDmGreen <= 0.0) return 0.0;
+
+            return (leaf.LAI + stressedLAI) / (dmGreen + dltDmGreen) * 10000; // (cm^2/g)
+        }
 
         /// <summary> Reset Culms at start of the simulation </summary>
         [EventSubscribe("StartOfSimulation")]
         private void StartOfSim(object sender, EventArgs e)
         {
-			FertileTillerNumber = 0.0;
-			CurrentTillerNumber = 0.0;
-			//dayOfClassicsEmergence = -1;
+            CurrentTillerNumber = 0.0;
+            CalculatedTillerNumber = 0.0;
+            DltTillerNumber = 0.0;
+            SupplyDemandRatio = 0.0;
         }
 
         /// <summary>Called when crop is sowed</summary>
         /// <param name="sender">The sender.</param>
         /// <param name="data">The <see cref="EventArgs"/> instance containing the event data.</param>
         [EventSubscribe("PlantSowing")]
-		protected void OnPlantSowing(object sender, SowingParameters data)
-		{
-			if (data.Plant == plant)
-			{
-				if (data.TilleringMethod == -1)
-					FertileTillerNumber = CalculateFtn();
-				else
-					FertileTillerNumber = data.FTN;
+        protected void OnPlantSowing(object sender, SowingParameters data)
+        {
+            if (data.Plant == plant)
+            {
+                population = data.Population;
+                plantsPerMetre = data.Population * data.RowSpacing / 1000.0 * data.SkipDensityScale;
                 CurrentTillerNumber = 0.0;
-			}
-		}
+                CalculatedTillerNumber = 0.0;
+                specifiedFertileTillerNumber = data.FTN;
 
-		private double CalculateFtn()
-		{
-			// Estimate tillering given latitude, density, time of planting and
-			// row configuration. this will be replaced with dynamic
-			// calculations in the near future. Above latitude -25 is CQ, -25
-			// to -29 is SQ, below is NNSW.
-			double intercept, slope;
-
-			if (weather.Latitude > -12.5 || weather.Latitude < -38.0)
-				// Unknown region.
-				throw new Exception("Unable to estimate number of tillers at latitude {weather.Latitude}");
-
-			if (weather.Latitude > -25.0)
-			{
-				// Central Queensland.
-				if (clock.Today.DayOfYear < 319 && clock.Today.DayOfYear > 182)
-				{
-					// Between 1 July and 15 November.
-					if (plant.SowingData.SkipRow > 1.9)
-					{
-						// Double (2.0).
-						intercept = 0.5786; slope = -0.0521;
-					}
-					else if (plant.SowingData.SkipRow > 1.4)
-					{
-						// Single (1.5).
-						intercept = 0.8786; slope = -0.0696;
-					}
-					else
-					{
-						// Solid (1.0).
-						intercept = 1.1786; slope = -0.0871;
-					}
-				}
-				else
-				{
-					// After 15 November.
-					if (plant.SowingData.SkipRow > 1.9)
-					{
-						// Double (2.0).
-						intercept = 0.4786; slope = -0.0421;
-					}
-					else if (plant.SowingData.SkipRow > 1.4)
-					{
-						// Single (1.5)
-						intercept = 0.6393; slope = -0.0486;
-					}
-					else
-					{
-						// Solid (1.0).
-						intercept = 0.8000; slope = -0.0550;
-					}
-				}
-			}
-			else if (weather.Latitude > -29.0)
-			{
-				// South Queensland.
-				if (clock.Today.DayOfYear < 319 && clock.Today.DayOfYear > 182)
-				{
-					// Between 1 July and 15 November.
-					if (plant.SowingData.SkipRow > 1.9)
-					{
-						// Double  (2.0).
-						intercept = 1.1571; slope = -0.1043;
-					}
-					else if (plant.SowingData.SkipRow > 1.4)
-					{
-						// Single (1.5).
-						intercept = 1.7571; slope = -0.1393;
-					}
-					else
-					{
-						// Solid (1.0).
-						intercept = 2.3571; slope = -0.1743;
-					}
-				}
-				else
-				{
-					// After 15 November.
-					if (plant.SowingData.SkipRow > 1.9)
-					{
-						// Double (2.0).
-						intercept = 0.6786; slope = -0.0621;
-					}
-					else if (plant.SowingData.SkipRow > 1.4)
-					{
-						// Single (1.5).
-						intercept = 1.1679; slope = -0.0957;
-					}
-					else
-					{
-						// Solid (1.0).
-						intercept = 1.6571; slope = -0.1293;
-					}
-				}
-			}
-			else
-			{
-				// Northern NSW.
-				if (clock.Today.DayOfYear < 319 && clock.Today.DayOfYear > 182)
-				{
-					//  Between 1 July and 15 November.
-					if (plant.SowingData.SkipRow > 1.9)
-					{
-						// Double (2.0).
-						intercept = 1.3571; slope = -0.1243;
-					}
-					else if (plant.SowingData.SkipRow > 1.4)
-					{
-						// Single (1.5).
-						intercept = 2.2357; slope = -0.1814;
-					}
-					else
-					{
-						// Solid (1.0).
-						intercept = 3.1143; slope = -0.2386;
-					}
-				}
-				else if (clock.Today.DayOfYear > 349 || clock.Today.DayOfYear < 182)
-				{
-					// Between 15 December and 1 July.
-					if (plant.SowingData.SkipRow > 1.9)
-					{
-						// Double (2.0).
-						intercept = 0.4000; slope = -0.0400;
-					}
-					else if (plant.SowingData.SkipRow > 1.4)
-					{
-						// Single (1.5).
-						intercept = 1.0571; slope = -0.0943;
-					}
-					else
-					{
-						// Solid (1.0).
-						intercept = 1.7143; slope = -0.1486;
-					}
-				}
-				else
-				{
-					// Between 15 November and 15 December.
-					if (plant.SowingData.SkipRow > 1.9)
-					{
-						// Double (2.0).
-						intercept = 0.8786; slope = -0.0821;
-					}
-					else if (plant.SowingData.SkipRow > 1.4)
-					{
-						// Single (1.5).
-						intercept = 1.6464; slope = -0.1379;
-					}
-					else
-					{
-						// Solid (1.0).
-						intercept = 2.4143; slope = -0.1936;
-					}
-				}
-			}
-
-			return Math.Max(slope * plant.SowingData.Population + intercept, 0);
-		}
-	}
+                radiationValues = 0.0;
+                temperatureValues = 0.0;
+            }
+        }
+    }
 }

@@ -3878,15 +3878,42 @@
                       "ReadOnly": false
                     },
                     {
-                      "$type": "Models.Functions.VariableReference, Models",
-                      "VariableName": "[Leaf].Parameters.slaMax",
-                      "Name": "slaMax",
-                      "ResourceName": null,
-                      "Children": [],
-                      "Enabled": true,
-                      "ReadOnly": false
-                    }
-                  ],
+					  "$type": "Models.Functions.VariableReference, Models",
+					  "VariableName": "[Leaf].Parameters.slaMax",
+					  "Name": "slaMax",
+					  "ResourceName": null,
+					  "Children": [],
+					  "Enabled": true,
+					  "ReadOnly": false
+					},
+					{
+					  "$type": "Models.Functions.VariableReference, Models",
+					  "VariableName": "[Leaf].Parameters.tillerSdIntercept",
+					  "Name": "tillerSdIntercept",
+					  "ResourceName": null,
+					  "Children": [],
+					  "Enabled": true,
+					  "ReadOnly": false
+					},
+					{
+					  "$type": "Models.Functions.VariableReference, Models",
+					  "VariableName": "[Leaf].Parameters.tillerSdSlope",
+					  "Name": "tillerSdSlope",
+					  "ResourceName": null,
+					  "Children": [],
+					  "Enabled": true,
+					  "ReadOnly": false
+					},
+					{
+					  "$type": "Models.Functions.VariableReference, Models",
+					  "VariableName": "[Leaf].Parameters.maxLAIForTillerAddition",
+					  "Name": "maxLAIForTillerAddition",
+					  "ResourceName": null,
+					  "Children": [],
+					  "Enabled": true,
+					  "ReadOnly": false
+					}
+				  ],
                   "Enabled": true,
                   "ReadOnly": false
                 },

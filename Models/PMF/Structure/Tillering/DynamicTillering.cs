@@ -5,7 +5,6 @@ using Models.Interfaces;
 using Models.PMF.Interfaces;
 using Models.PMF.Organs;
 using Models.PMF.Phen;
-using Models.Utilities;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -66,10 +65,6 @@ namespace Models.PMF.Struct
         [Link(Type = LinkType.Child, ByName = true)]
         IFunction tillerSlaBound = null;
 
-        /// <summary> Culms on the leaf </summary>
-        [Link(Type = LinkType.Child, ByName = true)]
-        IFunction slaMax = null;
-
         /// <summary>Number of potential Fertile Tillers at harvest</summary>
         [JsonIgnore]
         public double CalculatedTillerNumber { get; set; }
@@ -94,10 +89,6 @@ namespace Models.PMF.Struct
         [JsonIgnore]
         public double SupplyDemandRatio { get; private set; }
 
-        private int flagStage;
-        private int floweringStage;
-        private int endJuvenilePhase;
-        private int startOfGrainFillPhase;
         private const int startThermalQuotientLeafNo = 3;
         private const int endThermalQuotientLeafNo = 5;
         private double plantsPerMetre;
@@ -109,50 +100,13 @@ namespace Models.PMF.Struct
 
         private double GetDeltaDmGreen() { return leaf.potentialDMAllocation.Structural; }
 
-        private bool BeforeFlagLeafStage()
-        {
-            return BeforePhase("FlagLeaf", ref flagStage);
-        }
-
-        private bool BeforeFloweringStage()
-        {
-            return BeforePhase("Flowering", ref floweringStage);
-        }
-
-        private bool BeforeEndJuvenileStage()
-        {
-            return BeforePhase("EndJuvenile", ref endJuvenilePhase);
-        }
-
-        private bool AfterEndJuvenileStage()
-        {
-            return AfterPhase("EndJuvenile", ref endJuvenilePhase);
-        }
-
-        private bool BeforeStartOfGrainFillStage()
-        {
-            return BeforePhase("StartGrainFill", ref startOfGrainFillPhase);
-        }
-
-        private bool BeforePhase(string phaseName, ref int phaseIndex)
-        {
-            if (phaseIndex < 1) phaseIndex = phenology.StartStagePhaseIndex(phaseName);
-            return phenology.BeforePhase(phaseIndex);
-        }
-
-        private bool AfterPhase(string phaseName, ref int phaseIndex)
-        {
-            if (phaseIndex < 1) phaseIndex = phenology.StartStagePhaseIndex(phaseName);
-            return phenology.BeyondPhase(phaseIndex);
-        }
-
         /// <summary> Calculate number of leaves</summary>
         public double CalcLeafNumber()
         {
             if (culms.Culms?.Count == 0) return 0.0;
             if (!plant.IsEmerged) return 0.0;
             
-            if (BeforeEndJuvenileStage())
+            if (phenology.BeforeEndJuvenileStage())
             {
                 // ThermalTime Targets to EndJuv are not known until the end of the Juvenile Phase
                 // FinalLeafNo is not known until the TT Target is known - meaning the potential leaf sizes aren't known
@@ -165,7 +119,7 @@ namespace Models.PMF.Struct
             var dltLeafNoMainCulm = 0.0;
             culms.dltLeafNo = dltLeafNoMainCulm;
 
-            if (BeforeStartOfGrainFillStage())
+            if (phenology.BeforeStartOfGrainFillStage())
             {
                 // Calculate the leaf apperance on the main culm.
                 dltLeafNoMainCulm = CalcLeafAppearance(mainCulm);
@@ -218,7 +172,7 @@ namespace Models.PMF.Struct
                     CalcTillerNumber(PTQ);
                     AddInitialTillers();
                 }
-            }            
+            }
         }
 
         private void CalcTillerNumber(double PTQ)
@@ -349,7 +303,7 @@ namespace Models.PMF.Struct
         public double CalcPotentialLeafArea()
         {
             culms.Culms.ForEach(c => c.DltLAI = 0);
-            if (BeforeFloweringStage())
+            if (phenology.BeforeFloweringStage())
             {
                 return areaCalc.Value();
             }
@@ -362,7 +316,7 @@ namespace Models.PMF.Struct
             var mainCulm = culms.Culms.FirstOrDefault();
 
             if (mainCulm != null &&
-                AfterEndJuvenileStage() &&
+                phenology.AfterEndJuvenileStage() &&
                 CalculatedTillerNumber > 0.0 &&
                 mainCulm.CurrentLeafNo < mainCulm.PositionOfLargestLeaf
             )
@@ -387,21 +341,8 @@ namespace Models.PMF.Struct
 
             culms.Culms.ForEach(c => c.TotalLAI += c.DltStressedLAI);
 
-            //var calculatedLeafArea = dltStressedLAI2 - laiSlaReductionFraction;
-            //return calculatedLeafArea;
             return dltLAI;
         }
-
-        //double CalcSLA()
-        //{
-        //    double dmGreen = leaf.Live.Wt;
-        //    double dltDmGreen = GetDeltaDmGreen();
-
-        //    if (dmGreen + dltDmGreen <= 0.0) return 0.0;
-
-        //    // (cm^2/g)
-        //    return (lai + dltLAI) / (dmGreen + dltDmGreen) * 10000;
-        //}
 
         private void CalculateTillerCessation(double dltStressedLAI)
         {
@@ -491,15 +432,6 @@ namespace Models.PMF.Struct
             return fraction;
         }
 
-        // THIS IS THE OLD ONE.
-        private double CalcLeafReductionForCarbonLimitation(double dltStressedLAI)
-        {
-            double dltDmGreen = leaf.potentialDMAllocation.Structural;
-            if (dltDmGreen <= 0.0) return dltStressedLAI;
-            //new growth should exceed the SLA limits - cannot grow too quickly so that new leaf is too thin
-            return Math.Max(dltStressedLAI - (dltDmGreen * slaMax.Value().ConvertSqM2SqMM()), 0.0);
-        }
-
         /// <summary>
         /// Calculate SLA for leafa rea including potential new growth - stressess effect
         /// </summary>
@@ -514,27 +446,6 @@ namespace Models.PMF.Struct
 
             return (leaf.LAI + stressedLAI) / (dmGreen + dltDmGreen) * 10000; // (cm^2/g)
         }
-
-        //private double CalcCeaseTillerSignal(double dltStressedLAI)
-        //{
-        //    // calculate sla target that is below the actual SLA - so as the leaves gets thinner it signals to the tillers to cease growing further
-        //    // max SLA (thinnest leaf) possible using Reeves (1960's Kansas) SLA = 429.72 - 18.158 * LeafNo
-        //    var mainCulm = culms.Culms.First();
-        //    double maxSLA = 429.72 - 18.158 * (mainCulm.CurrentLeafNo + mainCulm.dltLeafNo);
-        //    maxSLA *= ((100 - tillerSlaBound.Value()) / 100.0);     // sla bound vary 30 - 40%
-        //    maxSLA = Math.Min(400, maxSLA);
-        //    maxSLA = Math.Max(150, maxSLA);
-
-        //    //calc how much LAI we need to remove to get back to the SLA target line
-        //    //this value will be limited by the proportion of tiller area in maxTillerLoss 
-        //    //dltStressedLai can be greater than the actual SLA limitation would allow
-        //    //provides a stronger signal
-        //    double dmGreen = leaf.Live.Wt;
-        //    double dltDmGreen = GetDeltaDmGreen();
-
-        //    var maxLaiTarget = maxSLA * (dmGreen + dltDmGreen) / 10000;
-        //    return Math.Max(leaf.LAI + dltStressedLAI - maxLaiTarget, 0);
-        //}
 
         void ReduceAllTillersProportionately(double laiReduction)
         {
