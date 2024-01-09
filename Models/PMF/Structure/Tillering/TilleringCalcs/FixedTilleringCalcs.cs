@@ -15,7 +15,7 @@ namespace Models.PMF
     public class FixedTilleringCalcs : ITilleringCalcs
     {
         /// <summary>The parent Plant</summary>
-        private readonly Plant plant = null;
+        protected readonly Plant plant = null;
 
         /// <summary> Culms on the leaf </summary>
         public LeafCulms culms = null;
@@ -30,7 +30,7 @@ namespace Models.PMF
         private readonly IWeather weather = null;
 
         /// <summary> Culms on the leaf </summary>
-        private readonly IFunction areaCalc = null;
+        protected readonly IFunction areaCalc = null;
 
         /// <summary> Propoensity to Tiller Intercept </summary>
         private readonly IFunction tillerSdIntercept = null;
@@ -125,7 +125,7 @@ namespace Models.PMF
         }
 
         /// <summary>Calculate number of leaves</summary>
-        public double CalcLeafNumber()
+        public virtual double CalcLeafNumber()
         {
             if (culms.Culms?.Count == 0) return 0.0;
             if (!plant.IsEmerged) return 0.0;
@@ -267,7 +267,7 @@ namespace Models.PMF
             var supply = PTQ * L5Area * Phy5;
             var supplyDemandRatio = MathUtilities.Divide(supply, demand, 0);
             // Calculate the tiller number using the intercept and slope values.
-            var calculatedValue= tillerSdIntercept.Value() + tillerSdSlope.Value() * supplyDemandRatio;
+            var calculatedValue = tillerSdIntercept.Value() + tillerSdSlope.Value() * supplyDemandRatio;
 
             // If we've got a fixed tillering FTN, then we need to limit it based on this.
             if (fixedTilleringFTN > 0.0)
@@ -303,7 +303,16 @@ namespace Models.PMF
                 int newNodeNumber = newLeaf - 3;
                 if (TillerOrder.Contains(newNodeNumber))
                 {
+                    //var tillerUpperLimit = CalculatedTillerNumber;
+
+                    //if (fixedTilleringFTN > 0)
+                    //{
+                    //    tillerUpperLimit = Math.Min(CalculatedTillerNumber, fixedTilleringFTN);
+                    //}
+
+                    //var fractionToAdd = Math.Min(1.0, tillerUpperLimit - tillersAdded);
                     var fractionToAdd = Math.Min(1.0, CalculatedTillerNumber - tillersAdded);
+
                     DltTillerNumber = fractionToAdd;
                     FertileTillerNumber += fractionToAdd;
                     InitiateTiller(newNodeNumber, fractionToAdd, 1);

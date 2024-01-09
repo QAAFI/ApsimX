@@ -102,8 +102,7 @@ namespace Models.PMF.Struct
         [EventSubscribe("StartOfSimulation")]
         private void StartOfSim(object sender, EventArgs e)
         {
-            // This can be null
-            tilleringCalculator?.StartOfSim();
+            tilleringCalculator = null;
         }
 
         /// <summary>Called when crop is sowed</summary>
@@ -120,6 +119,7 @@ namespace Models.PMF.Struct
                         culms,
                         phenology,
                         leaf,
+                        null,
                         weather,
                         areaCalc,
                         tillerSdIntercept,

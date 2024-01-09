@@ -24,6 +24,7 @@ namespace Models.PMF
             LeafCulms culms,
             Phenology phenology,
             SorghumLeaf leaf,
+            IClock clock,
             IWeather weather,
             IFunction areaCalc,
             IFunction tillerSdIntercept,
@@ -36,7 +37,7 @@ namespace Models.PMF
             switch (sowingParameters.TilleringMethod)
             {
                 case TILLERING_METHOD_RULE_OF_THUMB:
-                    return new RuleOfThumbTilleringCalcs(plant, culms, phenology, leaf, weather, areaCalc, tillerSdIntercept, tillerSdSlope, maxLAIForTillerAddition);
+                    return new RuleOfThumbTilleringCalcs(plant, culms, phenology, leaf, weather, areaCalc, tillerSdIntercept, tillerSdSlope, maxLAIForTillerAddition, clock);
 
                 case TILLERING_METHOD_FIXED:
                     return new FixedTilleringCalcs(plant, culms, phenology, leaf, weather, areaCalc, tillerSdIntercept, tillerSdSlope, maxLAIForTillerAddition, sowingParameters.FTN);

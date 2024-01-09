@@ -1,10 +1,11 @@
-﻿using Models.Functions;
+﻿using APSIM.Shared.Utilities;
+using Models.Functions;
 using Models.Interfaces;
 using Models.PMF.Organs;
 using Models.PMF.Phen;
 using Models.PMF.Struct;
 using System;
-using System.Linq;
+using System.Text.Json.Serialization;
 
 namespace Models.PMF
 {
@@ -12,6 +13,10 @@ namespace Models.PMF
     [Serializable]
     public class RuleOfThumbTilleringCalcs : FixedTilleringCalcs
     {
+        /// <summary>Current Number of Tillers</summary>
+        [JsonIgnore]
+        public double CurrentTillerNumber { get; set; }
+
         /// <summary>Constuctor</summary>
         public RuleOfThumbTilleringCalcs(
             Plant plant,
@@ -22,14 +27,10 @@ namespace Models.PMF
             IFunction areaCalc,
             IFunction tillerSdIntercept,
             IFunction tillerSdSlope,
-            IFunction maxLAIForTillerAddition
-        ) : base(plant, culms, phenology, leaf, weather, areaCalc, tillerSdIntercept, tillerSdSlope, maxLAIForTillerAddition, 0.0)
+            IFunction maxLAIForTillerAddition,
+            IClock clock
+        ) : base(plant, culms, phenology, leaf, weather, areaCalc, tillerSdIntercept, tillerSdSlope, maxLAIForTillerAddition, RuleOfThumbFTNGenerator.CalculateFtn(clock, weather, plant))
         {
         }
-
-        #region Public Interface
-        
-
-        #endregion
     }
 }

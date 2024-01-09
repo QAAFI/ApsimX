@@ -22,6 +22,12 @@ namespace Models.PMF.Struct
         [Link]
         private readonly Plant plant = null;
 
+        /// <summary>
+        /// Link to clock (used for FTN calculations at time of sowing).
+        /// </summary>
+        [Link]
+        private readonly IClock clock = null;
+
         /// <summary> Culms on the leaf </summary>
         [Link]
         public LeafCulms culms = null;
@@ -100,8 +106,7 @@ namespace Models.PMF.Struct
         [EventSubscribe("StartOfSimulation")]
         private void StartOfSim(object sender, EventArgs e)
         {
-            // This can be null
-            tilleringCalculator?.StartOfSim();
+            tilleringCalculator = null;
         }
 
         /// <summary>Called when crop is sowed</summary>
@@ -112,14 +117,13 @@ namespace Models.PMF.Struct
         {
             if (sowingParameters.Plant == plant)
             {
-                if (tilleringCalculator is null)
-                {
-                    tilleringCalculator = TilleringCalcsFactory.Create(
+                tilleringCalculator ??= TilleringCalcsFactory.Create(
                         sowingParameters,
                         plant,
                         culms,
                         phenology,
                         leaf,
+                        clock,
                         weather,
                         areaCalc,
                         tillerSdIntercept,
@@ -128,7 +132,6 @@ namespace Models.PMF.Struct
                         null,
                         null
                     );
-                }
 
                 tilleringCalculator.HandleOnPlantSowing(sowingParameters);
             }
