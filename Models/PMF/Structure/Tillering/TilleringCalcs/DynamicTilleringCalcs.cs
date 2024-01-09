@@ -31,7 +31,7 @@ namespace Models.PMF
             IFunction maxLAIForTillerAddition,
             IFunction maxDailyTillerReduction,
             IFunction tillerSlaBound
-        ) : base(plant, culms, phenology, leaf, weather, areaCalc, tillerSdIntercept, tillerSdSlope, maxLAIForTillerAddition)
+        ) : base(plant, culms, phenology, leaf, weather, areaCalc, tillerSdIntercept, tillerSdSlope, maxLAIForTillerAddition, 0.0)
         {
             this.maxDailyTillerReduction = maxDailyTillerReduction;
             this.tillerSlaBound = tillerSlaBound;

@@ -72,18 +72,18 @@ namespace Models.PMF.Struct
 
         /// <summary>Number of potential Fertile Tillers at harvest</summary>
         [JsonIgnore]
-        public double CalculatedTillerNumber 
+        public double CalculatedTillerNumber
         {
             get => tilleringCalculator?.CalculatedTillerNumber ?? 0.0;
         }
 
         [JsonIgnore]
-        private DynamicTilleringCalcs tilleringCalculator;
+        private ITilleringCalcs tilleringCalculator;
 
         /// <summary> Calculate number of leaves</summary>
         public double CalcLeafNumber()
-        {            
-            return tilleringCalculator.CalcLeafNumber(0.0);
+        {
+            return tilleringCalculator.CalcLeafNumber();
         }
 
         /// <summary>Calculate the potential leaf area</summary>
@@ -102,30 +102,34 @@ namespace Models.PMF.Struct
         [EventSubscribe("StartOfSimulation")]
         private void StartOfSim(object sender, EventArgs e)
         {
-            tilleringCalculator = new(
-                plant,
-                culms,
-                phenology,
-                leaf,
-                weather,
-                areaCalc,
-                tillerSdIntercept,
-                tillerSdSlope,
-                maxLAIForTillerAddition,
-                maxDailyTillerReduction, 
-                tillerSlaBound
-            );
+            // This can be null
+            tilleringCalculator?.StartOfSim();
         }
 
         /// <summary>Called when crop is sowed</summary>
         /// <param name="sender">The sender.</param>
-        /// <param name="data">The <see cref="EventArgs"/> instance containing the event data.</param>
+        /// <param name="sowingParameters">The <see cref="EventArgs"/> instance containing the event data.</param>
         [EventSubscribe("PlantSowing")]
-        protected void OnPlantSowing(object sender, SowingParameters data)
+        protected void OnPlantSowing(object sender, SowingParameters sowingParameters)
         {
-            if (data.Plant == plant && data.TilleringMethod == 1)
+            if (sowingParameters.Plant == plant && sowingParameters.TilleringMethod == 1)
             {
-                tilleringCalculator.HandleOnPlantSowing(data);
+                tilleringCalculator ??= TilleringCalcsFactory.Create(
+                        sowingParameters,
+                        plant,
+                        culms,
+                        phenology,
+                        leaf,
+                        weather,
+                        areaCalc,
+                        tillerSdIntercept,
+                        tillerSdSlope,
+                        maxLAIForTillerAddition,
+                        maxDailyTillerReduction,
+                        tillerSlaBound
+                    );
+
+                tilleringCalculator.HandleOnPlantSowing(sowingParameters);
             }
         }
     }

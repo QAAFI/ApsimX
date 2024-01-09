@@ -54,12 +54,6 @@ namespace Models.PMF.Struct
         [Link(Type = LinkType.Child, ByName = true)]
         private readonly IFunction maxLAIForTillerAddition = null;
 
-        /// <summary>Are we performing Rule Of Thumb tillering.</summary>
-        private bool RuleOfThumbTilleringMethod { get; set; }
-
-        /// <summary>If we are performing Fixed tillering then this will be the number of Fertile Tillers that was specified in the simulation.</summary>
-        private double FixedTilleringFTN { get; set; }
-
         /// <summary>Actual Number of Fertile Tillers</summary>
         [JsonIgnore]
         public double FertileTillerNumber
@@ -82,12 +76,12 @@ namespace Models.PMF.Struct
         }
 
         [JsonIgnore]
-        private FixedTilleringCalcs tilleringCalculator;
+        private ITilleringCalcs tilleringCalculator;
 
         /// <summary> Calculate number of leaves</summary>
         public double CalcLeafNumber()
         {
-            return tilleringCalculator?.CalcLeafNumber(FixedTilleringFTN) ?? 0.0;
+            return tilleringCalculator?.CalcLeafNumber() ?? 0.0;
         }
 
         /// <summary>Calculate the potential leaf area</summary>
@@ -106,46 +100,38 @@ namespace Models.PMF.Struct
         [EventSubscribe("StartOfSimulation")]
         private void StartOfSim(object sender, EventArgs e)
         {
-            tilleringCalculator = new(
-                plant,
-                culms,
-                phenology,
-                leaf,
-                weather,
-                areaCalc,
-                tillerSdIntercept,
-                tillerSdSlope,
-                maxLAIForTillerAddition
-            );
+            // This can be null
+            tilleringCalculator?.StartOfSim();
         }
 
         /// <summary>Called when crop is sowed</summary>
         /// <param name="sender">The sender.</param>
-        /// <param name="data">The <see cref="EventArgs"/> instance containing the event data.</param>
+        /// <param name="sowingParameters">The <see cref="EventArgs"/> instance containing the event data.</param>
         [EventSubscribe("PlantSowing")]
-        protected void OnPlantSowing(object sender, SowingParameters data)
+        protected void OnPlantSowing(object sender, SowingParameters sowingParameters)
         {
-            if (data.Plant == plant)
+            if (sowingParameters.Plant == plant)
             {
-                tilleringCalculator.HandleOnPlantSowing(data);
-                if (IsRuleOfThumbTilleringMethod(data.TilleringMethod))
+                if (tilleringCalculator is null)
                 {
-                    RuleOfThumbTilleringMethod = true;
-                    //currentTillerNumber = TilleringCalculations.CalculateFtnRuleOfThumb(clock, plant, weather);
+                    tilleringCalculator = TilleringCalcsFactory.Create(
+                        sowingParameters,
+                        plant,
+                        culms,
+                        phenology,
+                        leaf,
+                        weather,
+                        areaCalc,
+                        tillerSdIntercept,
+                        tillerSdSlope,
+                        maxLAIForTillerAddition,
+                        null,
+                        null
+                    );
                 }
-                
-                FixedTilleringFTN = data.FTN;
-            }
 
-            if (data.Plant == plant && data.TilleringMethod == 1)
-            {
-                tilleringCalculator.HandleOnPlantSowing(data);
+                tilleringCalculator.HandleOnPlantSowing(sowingParameters);
             }
-        }
-
-        private static bool IsRuleOfThumbTilleringMethod(int tilleringMethod)
-        {
-            return tilleringMethod == -1;
         }
     }
 }

@@ -12,10 +12,10 @@ namespace Models.PMF
 {
     /// <summary>Fixed Tillering Calculations</summary>
     [Serializable]
-    public class FixedTilleringCalcs
+    public class FixedTilleringCalcs : ITilleringCalcs
     {
         /// <summary>The parent Plant</summary>
-        protected readonly Plant plant = null;
+        private readonly Plant plant = null;
 
         /// <summary> Culms on the leaf </summary>
         public LeafCulms culms = null;
@@ -27,19 +27,22 @@ namespace Models.PMF
         protected readonly SorghumLeaf leaf = null;
 
         /// <summary>The met data</summary>
-        protected readonly IWeather weather = null;
+        private readonly IWeather weather = null;
 
         /// <summary> Culms on the leaf </summary>
-        protected readonly IFunction areaCalc = null;
+        private readonly IFunction areaCalc = null;
 
         /// <summary> Propoensity to Tiller Intercept </summary>
-        protected readonly IFunction tillerSdIntercept = null;
+        private readonly IFunction tillerSdIntercept = null;
 
         /// <summary> Propsenity to Tiller Slope </summary>
-        protected readonly IFunction tillerSdSlope = null;
+        private readonly IFunction tillerSdSlope = null;
 
         /// <summary> LAI Value where tillers are no longer added </summary>
         protected readonly IFunction maxLAIForTillerAddition = null;
+
+        /// <summary>If we are performing Fixed tillering then this will be the number of Fertile Tillers that was specified in the simulation.</summary>
+        private readonly double fixedTilleringFTN;
 
         /// <summary>Number of potential Fertile Tillers at harvest</summary>
         public double CalculatedTillerNumber { get; set; }
@@ -84,7 +87,8 @@ namespace Models.PMF
             IFunction areaCalc,
             IFunction tillerSdIntercept,
             IFunction tillerSdSlope,
-            IFunction maxLAIForTillerAddition
+            IFunction maxLAIForTillerAddition,
+            double fixedTilleringFTN
         )
         {
             this.plant = plant;
@@ -96,9 +100,18 @@ namespace Models.PMF
             this.tillerSdIntercept = tillerSdIntercept;
             this.tillerSdSlope = tillerSdSlope;
             this.maxLAIForTillerAddition = maxLAIForTillerAddition;
+            this.fixedTilleringFTN = fixedTilleringFTN;
         }
 
         #region Public Interface
+
+        /// <summary>Called when a StartOfSim event is captured from the tillering classes</summary>
+        public void StartOfSim()
+        {
+            FertileTillerNumber = 0.0;
+            CalculatedTillerNumber = 0.0;
+            DltTillerNumber = 0.0;
+        }
 
         /// <summary>Called when an OnSowing event is captured from the tillering classes</summary>
         public void HandleOnPlantSowing(SowingParameters sowingParameters)
@@ -112,7 +125,7 @@ namespace Models.PMF
         }
 
         /// <summary>Calculate number of leaves</summary>
-        public double CalcLeafNumber(double upperLimit = 0.0)
+        public double CalcLeafNumber()
         {
             if (culms.Culms?.Count == 0) return 0.0;
             if (!plant.IsEmerged) return 0.0;
@@ -146,7 +159,7 @@ namespace Models.PMF
 
             if (nLeaves > START_THERMAL_QUOTIENT_LEAF_NO)
             {
-                CalcTillers(newLeafNo, existingLeafNo, upperLimit);
+                CalcTillers(newLeafNo, existingLeafNo);
                 CalcTillerAppearance(newLeafNo, existingLeafNo);
             }
 
@@ -174,8 +187,12 @@ namespace Models.PMF
             return dltLAI;
         }
 
+        #endregion
+
+        #region Protected Interface
+
         /// <summary>Calculates the carbon limitation.</summary>
-        public double CalcCarbonLimitation(double dltStressedLAI)
+        protected double CalcCarbonLimitation(double dltStressedLAI)
         {
             double dltDmGreen = leaf.potentialDMAllocation.Structural;
             if (dltDmGreen <= 0.001) return 1.0;
@@ -211,7 +228,7 @@ namespace Models.PMF
             return dltLeafNo;
         }
 
-        private void CalcTillers(int newLeaf, int currentLeaf, double upperLimit)
+        private void CalcTillers(int newLeaf, int currentLeaf)
         {
             if (CalculatedTillerNumber > 0.0) return;
 
@@ -227,17 +244,14 @@ namespace Models.PMF
                 if (newLeaf == END_THERMAL_QUOTIENT_LEAF_NO)
                 {
                     double PTQ = RadiationValues / TemperatureValues;
-                    CalcTillerNumber(PTQ, upperLimit);
+                    CalcTillerNumber(PTQ);
                     AddInitialTillers();
                 }
             }
         }
 
         /// <summary>Calculates the tiller number.</summary>
-        private void CalcTillerNumber(
-            double PTQ,
-            double upperLimit
-        )
+        private void CalcTillerNumber(double PTQ)
         {
             // The final tiller number (Ftn) is calculated after the full appearance of LeafNo 5 - when leaf 6 emerges.
             // Calc Supply = R/oCd * LA5 * Phy5
@@ -256,9 +270,9 @@ namespace Models.PMF
             var calculatedValue= tillerSdIntercept.Value() + tillerSdSlope.Value() * supplyDemandRatio;
 
             // If we've got a fixed tillering FTN, then we need to limit it based on this.
-            if (upperLimit > 0.0)
+            if (fixedTilleringFTN > 0.0)
             {
-                calculatedValue = Math.Min(upperLimit, calculatedValue);
+                calculatedValue = Math.Min(fixedTilleringFTN, calculatedValue);
             }
 
             CalculatedTillerNumber = Math.Max(calculatedValue, 0.0);
