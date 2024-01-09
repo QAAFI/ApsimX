@@ -88,10 +88,6 @@ namespace Models.PMF.Struct
             get => tillering.CalculatedTillerNumber;
         }
 
-        /// <summary> CurrentTillerNumber is determined by the tillering method chosen</summary>
-		[JsonIgnore]
-        public double CurrentTillerNumber { get => tillering.CurrentTillerNumber; }
-
         /// <summary> Subsequent tillers are slightly smaller - adjust that size using a percentage</summary>
         [Link(Type = LinkType.Child, ByName = true)]
         public IFunction VerticalTillerAdjustment = null;

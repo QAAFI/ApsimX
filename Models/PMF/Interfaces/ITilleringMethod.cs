@@ -8,19 +8,17 @@ namespace Models.PMF.Interfaces
     /// </summary>
     public interface ITilleringMethod : IModel
     {
-        /// <summary> Update number of leaves for all culms </summary>
+        /// <summary>Update number of leaves for all culms</summary>
         double CalcLeafNumber();
-        /// <summary> Calculate the potential leaf area for the tillers</summary>
+
+        /// <summary>Calculate the potential leaf area for the tillers</summary>
         double CalcPotentialLeafArea();
 
-        /// <summary> Calculate the actual Area for the Culms</summary>
+        /// <summary>Calculate the actual Area for the Culms</summary>
         double CalcActualLeafArea(double dltStressedLAI);
 
-        /// <summary> Fertile tiller Number (at harvest) </summary>
+        /// <summary>Fertile Tiller Number (at harvest)</summary>
         double FertileTillerNumber { get; set; }
-
-        /// <summary>Current Number of Tillers</summary>
-        double CurrentTillerNumber { get; set; }
 
         /// <summary>Calculated Tiller Number</summary>
         double CalculatedTillerNumber { get; set; }

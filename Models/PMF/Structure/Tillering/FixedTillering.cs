@@ -1,5 +1,4 @@
-﻿using APSIM.Shared.Utilities;
-using Models.Core;
+﻿using Models.Core;
 using Models.Functions;
 using Models.Interfaces;
 using Models.PMF.Interfaces;
@@ -71,25 +70,18 @@ namespace Models.PMF.Struct
 
         /// <summary>Current Number of Tillers</summary>
         [JsonIgnore]
-        public double CurrentTillerNumber { get; set; }
-
-        /// <summary>Current Number of Tillers</summary>
-        [JsonIgnore]
         public double DltTillerNumber { get; set; }
 
         /// <summary>Actual Number of Fertile Tillers</summary>
         [JsonIgnore]
         public double FertileTillerNumber
         {
-            get => CurrentTillerNumber;
-            set => CurrentTillerNumber = value;
+            get => currentTillerNumber;
+            set => currentTillerNumber = value;
         }
 
-        /// <summary>Supply Demand Ratio used to calculate Tiller No</summary>
-        [JsonIgnore]
-        public double SupplyDemandRatio { get; private set; }
-
-        private double specifiedFertileTillerNumber = 0.0;
+        private double currentTillerNumber;
+        private double fixedTilleringFTN = 0.0;
         private double plantsPerMetre;
         private double population;
         private double radiationValues = 0.0;
@@ -174,48 +166,9 @@ namespace Models.PMF.Struct
                 if (newLeaf == TilleringCalculations.END_THERMAL_QUOTIENT_LEAF_NO)
                 {
                     double PTQ = radiationValues / temperatureValues;
-                    CalcTillerNumber(PTQ);
-                    AddInitialTillers();
+                    CalculatedTillerNumber = TilleringCalculations.CalcTillerNumber(culms, areaCalc, tillerSdIntercept, tillerSdSlope, PTQ, fixedTilleringFTN);
+                    TilleringCalculations.AddInitialTillers(CalculatedTillerNumber, culms, areaCalc, ref tillerOrder, ref currentTillerNumber);
                 }
-            }
-        }
-
-        private void CalcTillerNumber(double PTQ)
-        {
-            // The final tiller number (Ftn) is calculated after the full appearance of LeafNo 5 - when leaf 6 emerges.
-            // Calc Supply = R/oCd * LA5 * Phy5
-            var areaMethod = areaCalc as ICulmLeafArea;
-            var mainCulm = culms.Culms[0];
-            double L5Area = areaMethod.CalculateIndividualLeafArea(5, mainCulm);
-            double L9Area = areaMethod.CalculateIndividualLeafArea(9, mainCulm);
-
-            double Phy5 = culms.getLeafAppearanceRate(culms.FinalLeafNo - culms.Culms[0].CurrentLeafNo);
-
-            // Calc Demand = LA9 - LA5
-            var demand = L9Area - L5Area;
-            var supply = PTQ * L5Area * Phy5;
-            SupplyDemandRatio = MathUtilities.Divide(supply, demand, 0);
-
-            var calculatedTillerNumber = tillerSdIntercept.Value() + tillerSdSlope.Value() * SupplyDemandRatio;
-
-            CalculatedTillerNumber = Math.Max(
-                Math.Min(specifiedFertileTillerNumber, calculatedTillerNumber),
-                0.0
-            );
-        }
-
-        private void AddInitialTillers()
-        {
-            tillerOrder = TilleringCalculations.CalculateTillerOrder(CalculatedTillerNumber);
-
-            if (CalculatedTillerNumber <= 0) return;
-
-            int nTillers = (int)Math.Ceiling(CalculatedTillerNumber);
-
-            if (nTillers > 3)
-            {
-                InitiateTiller(1, 1, 2);
-                CurrentTillerNumber = 1;
             }
         }
 
@@ -247,39 +200,27 @@ namespace Models.PMF.Struct
                     var fractionToAdd = Math.Min(1.0, CalculatedTillerNumber - tillersAdded);
 
                     DltTillerNumber = fractionToAdd;
-                    CurrentTillerNumber += fractionToAdd;
+                    currentTillerNumber += fractionToAdd;
 
-                    InitiateTiller(newNodeNumber, fractionToAdd, 1);
+                    TilleringCalculations.InitiateTiller(
+                        culms,
+                        areaCalc,
+                        currentTillerNumber,
+                        newNodeNumber, 
+                        fractionToAdd, 
+                        1
+                    );
                 }
             }
-        }
-
-        /// <summary>
-        /// Add a tiller.
-        /// </summary>
-        private void InitiateTiller(int tillerNumber, double fractionToAdd, double initialLeaf)
-        {
-            double leafNoAtAppearance = 1.0;
-            Culm newCulm = new(leafNoAtAppearance)
-            {
-                CulmNo = tillerNumber,
-                CurrentLeafNo = initialLeaf,
-                VertAdjValue = culms.MaxVerticalTillerAdjustment.Value() + (CurrentTillerNumber * culms.VerticalTillerAdjustment.Value()),
-                Proportion = fractionToAdd,
-                FinalLeafNo = culms.Culms[0].FinalLeafNo
-            };
-            newCulm.UpdatePotentialLeafSizes(areaCalc as ICulmLeafArea);
-            culms.Culms.Add(newCulm);
         }
 
         /// <summary> Reset Culms at start of the simulation </summary>
         [EventSubscribe("StartOfSimulation")]
         private void StartOfSim(object sender, EventArgs e)
         {
-            CurrentTillerNumber = 0.0;
+            currentTillerNumber = 0.0;
             CalculatedTillerNumber = 0.0;
             DltTillerNumber = 0.0;
-            SupplyDemandRatio = 0.0;
         }
 
         /// <summary>Called when crop is sowed</summary>
@@ -290,19 +231,19 @@ namespace Models.PMF.Struct
         {
             if (data.Plant == plant)
             {
-                CurrentTillerNumber = 0.0;
+                currentTillerNumber = 0.0;
 
                 isRuleOfThumbTilleringMethod = IsRuleOfThumbTilleringMethod(data.TilleringMethod);
 
                 if (isRuleOfThumbTilleringMethod)
                 {
-                    CurrentTillerNumber = TilleringCalculations.CalculateFtnRuleOfThumb(clock, plant, weather);
+                    currentTillerNumber = TilleringCalculations.CalculateFtnRuleOfThumb(clock, plant, weather);
                 }
 
                 population = data.Population;
                 plantsPerMetre = data.Population * data.RowSpacing / 1000.0 * data.SkipDensityScale;                
                 CalculatedTillerNumber = 0.0;
-                specifiedFertileTillerNumber = data.FTN;
+                fixedTilleringFTN = data.FTN;
 
                 radiationValues = 0.0;
                 temperatureValues = 0.0;

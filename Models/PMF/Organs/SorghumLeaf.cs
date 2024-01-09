@@ -188,12 +188,6 @@ namespace Models.PMF.Organs
             get => culms?.CalculatedTillerNumber ?? 0;
         }
 
-        /// <summary>Determined by the tillering method chosen.</summary>
-        /// <summary>If TilleringMethod == FixedTillering then this value needs to be set by the user.</summary>
-        [JsonIgnore]
-        [Description("Current Tiller Number")]
-        public double CurrentTillerNumber => culms.CurrentTillerNumber;
-
         /// <summary>The initial biomass dry matter weight</summary>
         [Description("Initial leaf dry matter weight")]
         [Units("g/m2")]
