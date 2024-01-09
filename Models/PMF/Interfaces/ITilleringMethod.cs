@@ -21,6 +21,6 @@ namespace Models.PMF.Interfaces
         double FertileTillerNumber { get; set; }
 
         /// <summary>Calculated Tiller Number</summary>
-        double CalculatedTillerNumber { get; set; }
+        double CalculatedTillerNumber { get; }
     }
 }
