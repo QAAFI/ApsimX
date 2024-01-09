@@ -83,19 +83,19 @@ namespace Models.PMF.Struct
         /// <summary> Calculate number of leaves</summary>
         public double CalcLeafNumber()
         {
-            return tilleringCalculator.CalcLeafNumber();
+            return tilleringCalculator?.CalcLeafNumber() ?? 0.0;
         }
 
         /// <summary>Calculate the potential leaf area</summary>
         public double CalcPotentialLeafArea()
         {
-            return tilleringCalculator.CalcPotentialLeafArea();
+            return tilleringCalculator?.CalcPotentialLeafArea() ?? 0.0;
         }
 
         /// <summary>Calculate the actual leaf area</summary>
         public double CalcActualLeafArea(double dltStressedLAI)
         {
-            return tilleringCalculator.CalcActualLeafArea(dltStressedLAI);
+            return tilleringCalculator?.CalcActualLeafArea(dltStressedLAI) ?? 0.0;
         }
 
         /// <summary> Reset Culms at start of the simulation </summary>
