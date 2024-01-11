@@ -1,11 +1,9 @@
-﻿using APSIM.Shared.Utilities;
-using Models.Functions;
+﻿using Models.Functions;
 using Models.Interfaces;
 using Models.PMF.Organs;
 using Models.PMF.Phen;
 using Models.PMF.Struct;
 using System;
-using System.Text.Json.Serialization;
 
 namespace Models.PMF
 {
@@ -13,10 +11,6 @@ namespace Models.PMF
     [Serializable]
     public class RuleOfThumbTilleringCalcs : FixedTilleringCalcs
     {
-        /// <summary>Current Number of Tillers</summary>
-        [JsonIgnore]
-        public double CurrentTillerNumber { get; set; }
-
         /// <summary>Constuctor</summary>
         public RuleOfThumbTilleringCalcs(
             Plant plant,

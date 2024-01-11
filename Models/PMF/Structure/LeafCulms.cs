@@ -66,13 +66,13 @@ namespace Models.PMF.Struct
         [JsonIgnore]
         public int TilleringMethod { get; set; }
 
-        private ITilleringMethod tillering => TilleringMethod == 0 ? fixedTillering : dynamicTillering;
+        private ITilleringMethod Tillering => TilleringMethod == TilleringCalcsFactory.TILLERING_METHOD_DYNAMIC ? dynamicTillering : fixedTillering;
 
         /// <summary> FertileTillerNumber is determined by the tillering method chosen</summary>
 		[JsonIgnore]
         public double FertileTillerNumber
         {
-            get => tillering.FertileTillerNumber;
+            get => Tillering.FertileTillerNumber;
             set
             {
                 //the preferred method for setting FertileTillerNumber is during the sowing event
@@ -85,7 +85,7 @@ namespace Models.PMF.Struct
 		[JsonIgnore]
         public double CalculatedTillerNumber
         {
-            get => tillering.CalculatedTillerNumber;
+            get => Tillering.CalculatedTillerNumber;
         }
 
         /// <summary> Subsequent tillers are slightly smaller - adjust that size using a percentage</summary>
@@ -173,9 +173,9 @@ namespace Models.PMF.Struct
             //FinalLeafNo = numberOfLeaves.Value();
             Culms.ForEach(c => c.FinalLeafNo = FinalLeafNo);
 
-            dltLeafNo = tillering.CalcLeafNumber();
+            dltLeafNo = Tillering.CalcLeafNumber();
 
-            dltPotentialLAI = tillering.CalcPotentialLeafArea();
+            dltPotentialLAI = Tillering.CalcPotentialLeafArea();
             double expStress = expansionStress.Value();
             dltStressedLAI = dltPotentialLAI * expStress;
             Culms.ForEach(c => c.DltStressedLAI = c.DltLAI * expStress);
@@ -184,7 +184,7 @@ namespace Models.PMF.Struct
         /// <summary>Calculate Actual Area - adjusts potential growth </summary>
         public double CalculateActualArea()
         {
-            double actualLAI = tillering.CalcActualLeafArea(dltStressedLAI);
+            double actualLAI = Tillering.CalcActualLeafArea(dltStressedLAI);
 
             Culms.ForEach(c => c.TotalLAI += c.DltStressedLAI);
             return actualLAI;

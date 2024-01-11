@@ -125,7 +125,7 @@ namespace Models.PMF
         }
 
         /// <summary>Calculate number of leaves</summary>
-        public virtual double CalcLeafNumber()
+        public double CalcLeafNumber()
         {
             if (culms.Culms?.Count == 0) return 0.0;
             if (!plant.IsEmerged) return 0.0;
