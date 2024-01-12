@@ -22,7 +22,6 @@ namespace Models.PMF
             IFunction tillerSdIntercept,
             IFunction tillerSdSlope,
             IFunction maxLAIForTillerAddition,
-            IClock clock,
             double fertileTillerNumber
         ) : base(plant, culms, phenology, leaf, weather, areaCalc, tillerSdIntercept, tillerSdSlope, maxLAIForTillerAddition, fertileTillerNumber)
         {
