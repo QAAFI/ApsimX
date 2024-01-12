@@ -37,7 +37,8 @@ namespace Models.PMF
             switch (sowingParameters.TilleringMethod)
             {
                 case TILLERING_METHOD_RULE_OF_THUMB:
-                    return new RuleOfThumbTilleringCalcs(plant, culms, phenology, leaf, weather, areaCalc, tillerSdIntercept, tillerSdSlope, maxLAIForTillerAddition, clock);
+                    var fertileTillerNumber = RuleOfThumbFTNGenerator.CalculateFtn(clock, weather, plant);
+                    return new RuleOfThumbTilleringCalcs(plant, culms, phenology, leaf, weather, areaCalc, tillerSdIntercept, tillerSdSlope, maxLAIForTillerAddition, clock, fertileTillerNumber);
 
                 case TILLERING_METHOD_FIXED:
                     return new FixedTilleringCalcs(plant, culms, phenology, leaf, weather, areaCalc, tillerSdIntercept, tillerSdSlope, maxLAIForTillerAddition, sowingParameters.FTN);

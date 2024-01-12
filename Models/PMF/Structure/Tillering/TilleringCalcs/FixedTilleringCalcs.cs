@@ -77,6 +77,9 @@ namespace Models.PMF
         /// <summary>The end of the period during which average PTQ is calculated</summary>
         protected const int END_THERMAL_QUOTIENT_LEAF_NO = 5;
 
+        /// <summary>The end of the period during which average PTQ is calculated</summary>
+        protected const double UNDEFINED_FERTILE_TILLER_NUMBER = -1.0;
+
         /// <summary>Constuctor</summary>
         public FixedTilleringCalcs(
             Plant plant,
@@ -270,7 +273,7 @@ namespace Models.PMF
             var calculatedValue = tillerSdIntercept.Value() + tillerSdSlope.Value() * supplyDemandRatio;
 
             // If we've got a fixed tillering FTN, then we need to limit it based on this.
-            if (fixedTilleringFTN > 0.0)
+            if (fixedTilleringFTN > UNDEFINED_FERTILE_TILLER_NUMBER)
             {
                 calculatedValue = Math.Min(fixedTilleringFTN, calculatedValue);
             }
