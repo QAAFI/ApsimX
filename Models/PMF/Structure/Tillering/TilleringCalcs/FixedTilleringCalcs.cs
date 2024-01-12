@@ -303,16 +303,7 @@ namespace Models.PMF
                 int newNodeNumber = newLeaf - 3;
                 if (TillerOrder.Contains(newNodeNumber))
                 {
-                    //var tillerUpperLimit = CalculatedTillerNumber;
-
-                    //if (fixedTilleringFTN > 0)
-                    //{
-                    //    tillerUpperLimit = Math.Min(CalculatedTillerNumber, fixedTilleringFTN);
-                    //}
-
-                    //var fractionToAdd = Math.Min(1.0, tillerUpperLimit - tillersAdded);
                     var fractionToAdd = Math.Min(1.0, CalculatedTillerNumber - tillersAdded);
-
                     DltTillerNumber = fractionToAdd;
                     FertileTillerNumber += fractionToAdd;
                     InitiateTiller(newNodeNumber, fractionToAdd, 1);
