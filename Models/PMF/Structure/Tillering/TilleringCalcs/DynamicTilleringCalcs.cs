@@ -45,7 +45,8 @@ namespace Models.PMF
             var mainCulm = culms.Culms.FirstOrDefault();
 
             if (mainCulm != null &&
-                phenology.AfterEndJuvenileStage() &&
+                plant.Phenology.Stage > 4 &&
+                //phenology.AfterEndJuvenileStage() &&
                 CalculatedTillerNumber > 0.0 &&
                 mainCulm.CurrentLeafNo < mainCulm.PositionOfLargestLeaf
             )
@@ -147,8 +148,10 @@ namespace Models.PMF
 
             // Calc how much LAI we need to remove to get back to the SLA target line.
             // This is done by reducing the proportion of tiller area.
-            var maxLaiTarget = maxSLA * (dmGreen + dltDmGreen) / 10000;
-            return Math.Max(leaf.LAI + dltStressedLAI - maxLaiTarget, 0);
+            //var maxLaiTarget = maxSLA * (dmGreen + dltDmGreen) / 10000;
+            var maxLaiTarget = maxSLA * (dmGreen) / 10000;
+            //return Math.Max(leaf.LAI + dltStressedLAI - maxLaiTarget, 0);
+            return Math.Max(leaf.LAI  - maxLaiTarget, 0);
         }
 
         private void ReduceAllTillersProportionately(double laiReduction)
