@@ -73,7 +73,7 @@ namespace Models.DCAPST.Canopy
 
             // Conditionally include Ac2
             Ac2.Type = PathwayType.Ac2;
-            if (!(assimilation is AssimilationC3)) pathways.Add(Ac2);
+            if (assimilation is not AssimilationC3) pathways.Add(Ac2);
 
             // Always include Aj
             Aj.Type = PathwayType.Aj;
@@ -141,7 +141,7 @@ namespace Models.DCAPST.Canopy
                 var func = t.UpdateA(assimilation, p);
                 assimilation.UpdatePartialPressures(p, t.Leaf, func);
 
-                if (!(assimilation is AssimilationC3))
+                if (assimilation is not AssimilationC3)
                     t.UpdateA(assimilation, p);
 
                 if (updateT)
