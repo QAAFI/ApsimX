@@ -59,17 +59,17 @@ namespace Models.DCAPST
         /// <summary>
         /// The plant which is set dynamically, based on the CropName.
         /// </summary>
-        IPlant plant;
+        private IPlant plant;
 
         /// <summary>
         /// The leaf.
         /// </summary>
-        ICanopy leaf;
+        private ICanopy leaf;
 
         /// <summary>
         /// The root shoot ration function
         /// </summary>
-        IFunction rootShootRatioFunction;
+        private IFunction rootShootRatioFunction;
 
         /// <summary>
         /// This flag is set to indicate that we have started using DCaPST. 
@@ -203,7 +203,8 @@ namespace Models.DCAPST
             {
                 CanopyType.C3 => new AssimilationC3(canopyParameters, pathwayParameters),
                 CanopyType.C4 => new AssimilationC4(canopyParameters, pathwayParameters),
-                _ => new AssimilationCCM(canopyParameters, pathwayParameters)
+                CanopyType.CCM => new AssimilationCCM(canopyParameters, pathwayParameters),
+                _ => throw new ArgumentException($"Unsupported canopy type: {canopyParameters.Type}"),
             };
 
             var sunlit = new AssimilationArea(sunlitAc1, sunlitAc2, sunlitAj, assimilation);
