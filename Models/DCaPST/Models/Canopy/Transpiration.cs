@@ -10,23 +10,28 @@ namespace Models.DCAPST.Canopy
         /// <summary>
         /// The canopy parameters
         /// </summary>
-        public ICanopyParameters Canopy { get; private set; }
+        private readonly ICanopyParameters canopy;
 
         /// <summary>
         /// The pathway parameters
         /// </summary>
 
-        public IPathwayParameters Pathway { get; private set; }
+        private readonly IPathwayParameters pathway;
 
         /// <summary>
         /// Models the leaf water interaction
         /// </summary>
-        public IWaterInteraction Water { get; }
+        private readonly IWaterInteraction water;
 
         /// <summary>
         /// Models how the leaf responds to different temperatures
         /// </summary>
-        public TemperatureResponse Leaf { get; set; }
+        private readonly TemperatureResponse leaf;
+
+        /// <summary>
+        /// Provides access to the leaf GmT value.
+        /// </summary>
+        public double LeafGmT => leaf.GmT;
 
         /// <summary>
         /// If the transpiration rate is limited
@@ -67,10 +72,10 @@ namespace Models.DCAPST.Canopy
             TemperatureResponse leaf
         )
         {
-            Canopy = canopy;
-            Pathway = pathway;
-            Water = water;
-            Leaf = leaf;
+            this.canopy = canopy;
+            this.pathway = pathway;
+            this.water = water;
+            this.leaf = leaf;
         }
 
         /// <summary>
@@ -78,8 +83,18 @@ namespace Models.DCAPST.Canopy
         /// </summary>
         public void SetConditions(ParameterRates At25C, double photons, double radiation)
         {
-            Leaf.SetConditions(At25C, photons);
-            Water.SetConditions(BoundaryHeatConductance, radiation);
+            leaf.SetConditions(At25C, photons);
+            water.SetConditions(BoundaryHeatConductance, radiation);
+        }
+
+        /// <summary>
+        /// Sets the temperature which is needed by the leaf and water interaction.
+        /// </summary>
+        /// <param name="temperature"></param>
+        public void SetTemperature(double temperature)
+        {
+            leaf.Temperature = temperature;
+            water.LeafTemp = temperature;
         }
 
         /// <summary>
@@ -90,7 +105,7 @@ namespace Models.DCAPST.Canopy
         /// <returns></returns>
         public AssimilationFunction UpdateA(IAssimilation assimilation, AssimilationPathway pathway)
         {
-            var func = assimilation.GetFunction(pathway, Leaf);
+            var func = assimilation.GetFunction(pathway, leaf);
 
             if (Limited)
             {
@@ -101,11 +116,11 @@ namespace Models.DCAPST.Canopy
                 pathway.WaterUse = MaxRate * Fraction;
                 var WaterUseMolsSecond = pathway.WaterUse / molarMassWater * g_to_kg / hrs_to_seconds;
 
-                Resistance = Water.LimitedWaterResistance(pathway.WaterUse);
-                var Gt = Water.TotalCO2Conductance(Resistance);
+                Resistance = water.LimitedWaterResistance(pathway.WaterUse);
+                var Gt = water.TotalCO2Conductance(Resistance);
 
-                func.Ci = Canopy.AirCO2 - WaterUseMolsSecond * Canopy.AirCO2 / (Gt + WaterUseMolsSecond / 2.0);
-                func.Rm = 1 / (Gt + WaterUseMolsSecond / 2) + 1.0 / Leaf.GmT;
+                func.Ci = canopy.AirCO2 - WaterUseMolsSecond * canopy.AirCO2 / (Gt + WaterUseMolsSecond / 2.0);
+                func.Rm = 1 / (Gt + WaterUseMolsSecond / 2) + 1.0 / leaf.GmT;
 
                 pathway.CO2Rate = func.Value();
 
@@ -113,17 +128,17 @@ namespace Models.DCAPST.Canopy
             }
             else
             {
-                pathway.IntercellularCO2 = Pathway.IntercellularToAirCO2Ratio * Canopy.AirCO2;
+                pathway.IntercellularCO2 = this.pathway.IntercellularToAirCO2Ratio * canopy.AirCO2;
 
                 func.Ci = pathway.IntercellularCO2;
-                func.Rm = 1 / Leaf.GmT;
+                func.Rm = 1 / leaf.GmT;
 
                 pathway.CO2Rate = func.Value();
 
-                Resistance = Water.UnlimitedWaterResistance(pathway.CO2Rate, Canopy.AirCO2, pathway.IntercellularCO2);
-                pathway.WaterUse = Water.HourlyWaterUse(Resistance);
+                Resistance = water.UnlimitedWaterResistance(pathway.CO2Rate, canopy.AirCO2, pathway.IntercellularCO2);
+                pathway.WaterUse = water.HourlyWaterUse(Resistance);
             }
-            pathway.VPD = Water.VPD;
+            pathway.VPD = water.VPD;
 
             return func;
         }
@@ -133,7 +148,7 @@ namespace Models.DCAPST.Canopy
         /// </summary>
         public void UpdateTemperature(AssimilationPathway pathway)
         {
-            var leafTemp = Water.LeafTemperature(Resistance);
+            var leafTemp = water.LeafTemperature(Resistance);
             pathway.Temperature = (leafTemp + pathway.Temperature) / 2.0;
         }
     }

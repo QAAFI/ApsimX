@@ -29,9 +29,9 @@ namespace Models.DCAPST
         }
 
         /// <inheritdoc/>
-        protected override void UpdateMesophyllCO2(AssimilationPathway pathway, TemperatureResponse leaf)
+        protected override void UpdateMesophyllCO2(AssimilationPathway pathway, double leafGmT)
         {
-            pathway.MesophyllCO2 = pathway.IntercellularCO2 - pathway.CO2Rate / leaf.GmT;
+            pathway.MesophyllCO2 = pathway.IntercellularCO2 - pathway.CO2Rate / leafGmT;
         }
 
         /// <inheritdoc/>

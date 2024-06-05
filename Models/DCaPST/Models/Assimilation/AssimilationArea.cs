@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using Models.DCAPST.Environment;
 using Models.DCAPST.Interfaces;
 
 namespace Models.DCAPST.Canopy
@@ -12,14 +13,12 @@ namespace Models.DCAPST.Canopy
         /// <summary>
         /// The assimilation model
         /// </summary>
-        IAssimilation assimilation;
+        readonly IAssimilation assimilation;
 
         /// <summary>
         /// A group of parameters valued at the reference temperature of 25 Celsius
         /// </summary>
         public ParameterRates At25C { get; private set; } = new ParameterRates();
-
-        private double iteration { get; set; }
 
         /// <summary>
         /// The leaf area index of this part of the canopy
@@ -135,17 +134,20 @@ namespace Models.DCAPST.Canopy
         {
             foreach (var p in pathways)
             {
-                t.Leaf.Temperature = p.Temperature;
-                t.Water.LeafTemp = p.Temperature;
+                t.SetTemperature(p.Temperature);
 
                 var func = t.UpdateA(assimilation, p);
-                assimilation.UpdatePartialPressures(p, t.Leaf, func);
+                assimilation.UpdatePartialPressures(p, t.LeafGmT, func);
 
                 if (assimilation is not AssimilationC3)
+                {
                     t.UpdateA(assimilation, p);
+                }
 
                 if (updateT)
+                {
                     t.UpdateTemperature(p);
+                }
 
                 if (double.IsNaN(p.CO2Rate) || double.IsNaN(p.WaterUse))
                 {
