@@ -135,7 +135,7 @@ namespace Models.DCAPST.Canopy
         {
             foreach (var p in pathways)
             {
-                t.Leaf.temperature = p.Temperature;
+                t.Leaf.Temperature = p.Temperature;
                 t.Water.LeafTemp = p.Temperature;
 
                 var func = t.UpdateA(assimilation, p);
