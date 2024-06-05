@@ -1,5 +1,3 @@
-using DocumentFormat.OpenXml.Vml.Spreadsheet;
-using Models.DCAPST.Environment;
 using Models.DCAPST.Interfaces;
 using System;
 
@@ -150,79 +148,18 @@ namespace Models.DCAPST
 
         private void RecalculateParams()
         {
-            // Update any temperature specific calculations.
-            UpdateVcMaxT();
-            UpdateRdT();
-            UpdateJMaxT();
-            UpdateVpMaxT();
-            UpdateGmT();
-            UpdateKc();
-            UpdateKo();
-            UpdateVcVo();
-            UpdateKp();
-            UpdateElectronTransportRate();
-            UpdateSco();
-            UpdateGamma();
-            UpdateGmRd();
-        }
-
-        private void UpdateVcMaxT()
-        {
             VcMaxT = Value(temperature, rateAt25.VcMax, pathway.RubiscoActivity.Factor);
-        }
-
-        private void UpdateRdT()
-        {
             RdT = Value(temperature, rateAt25.Rd, pathway.Respiration.Factor);
-        }
-
-        private void UpdateJMaxT()
-        {
             JMaxT = ValueOptimum(temperature, rateAt25.JMax, pathway.ElectronTransportRateParams);
-        }
-
-        private void UpdateVpMaxT()
-        {
             VpMaxT = Value(temperature, rateAt25.VpMax, pathway.PEPcActivity.Factor);
-        }
-
-        private void UpdateGmT()
-        {
             GmT = Value(temperature, rateAt25.Gm, pathway.MesophyllCO2ConductanceParams.Factor);
-        }
-
-        private void UpdateKc()
-        {
             Kc = Value(temperature, pathway.RubiscoCarboxylation.At25, pathway.RubiscoCarboxylation.Factor);
-        }
-
-        private void UpdateKo()
-        {
             Ko = Value(temperature, pathway.RubiscoOxygenation.At25, pathway.RubiscoOxygenation.Factor);
-        }
-
-        private void UpdateVcVo()
-        {
             VcVo = Value(temperature, pathway.RubiscoCarboxylationToOxygenation.At25, pathway.RubiscoCarboxylationToOxygenation.Factor);
-        }
-
-        private void UpdateKp()
-        {
             Kp = Value(temperature, pathway.PEPc.At25, pathway.PEPc.Factor);
-        }
-
-        private void UpdateSco()
-        {
+            UpdateElectronTransportRate();
             Sco = Ko / Kc * VcVo;
-        }
-
-        private void UpdateGamma()
-        {
             Gamma = 0.5 / Sco;
-        }
-
-        private void UpdateGmRd()
-        {
             GmRd = RdT * 0.5;
         }
 
