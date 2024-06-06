@@ -93,7 +93,7 @@ namespace Models.DCAPST.Canopy
         /// <param name="leafTemperature"></param>
         public void SetLeafTemperature(double leafTemperature)
         {
-            leaf.Temperature = leafTemperature;
+            leaf.LeafTemperature = leafTemperature;
             water.LeafTemp = leafTemperature;
         }
 

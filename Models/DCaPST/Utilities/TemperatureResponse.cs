@@ -35,7 +35,7 @@ namespace Models.DCAPST
         /// <summary>
         /// The leaf temperature.
         /// </summary>
-        private double temperature;
+        private double leafTemperature;
 
         /// <summary>
         /// 
@@ -64,18 +64,18 @@ namespace Models.DCAPST
         /// <summary>
         /// The current leaf temperature
         /// </summary>
-        public double Temperature 
+        public double LeafTemperature 
         { 
             get
             {
-                return temperature;
+                return leafTemperature;
             }
 
             set
             {
-                if (temperature != value)
+                if (leafTemperature != value)
                 {
-                    temperature = value;
+                    leafTemperature = value;
                     RecalculateParams();
                 }
             }
@@ -148,15 +148,15 @@ namespace Models.DCAPST
 
         private void RecalculateParams()
         {
-            VcMaxT = Value(temperature, rateAt25.VcMax, pathway.RubiscoActivity.Factor);
-            RdT = Value(temperature, rateAt25.Rd, pathway.Respiration.Factor);
-            JMaxT = ValueOptimum(temperature, rateAt25.JMax, pathway.ElectronTransportRateParams);
-            VpMaxT = Value(temperature, rateAt25.VpMax, pathway.PEPcActivity.Factor);
-            GmT = Value(temperature, rateAt25.Gm, pathway.MesophyllCO2ConductanceParams.Factor);
-            Kc = Value(temperature, pathway.RubiscoCarboxylation.At25, pathway.RubiscoCarboxylation.Factor);
-            Ko = Value(temperature, pathway.RubiscoOxygenation.At25, pathway.RubiscoOxygenation.Factor);
-            VcVo = Value(temperature, pathway.RubiscoCarboxylationToOxygenation.At25, pathway.RubiscoCarboxylationToOxygenation.Factor);
-            Kp = Value(temperature, pathway.PEPc.At25, pathway.PEPc.Factor);
+            VcMaxT = Value(leafTemperature, rateAt25.VcMax, pathway.RubiscoActivity.Factor);
+            RdT = Value(leafTemperature, rateAt25.Rd, pathway.Respiration.Factor);
+            JMaxT = ValueOptimum(leafTemperature, rateAt25.JMax, pathway.ElectronTransportRateParams);
+            VpMaxT = Value(leafTemperature, rateAt25.VpMax, pathway.PEPcActivity.Factor);
+            GmT = Value(leafTemperature, rateAt25.Gm, pathway.MesophyllCO2ConductanceParams.Factor);
+            Kc = Value(leafTemperature, pathway.RubiscoCarboxylation.At25, pathway.RubiscoCarboxylation.Factor);
+            Ko = Value(leafTemperature, pathway.RubiscoOxygenation.At25, pathway.RubiscoOxygenation.Factor);
+            VcVo = Value(leafTemperature, pathway.RubiscoCarboxylationToOxygenation.At25, pathway.RubiscoCarboxylationToOxygenation.Factor);
+            Kp = Value(leafTemperature, pathway.PEPc.At25, pathway.PEPc.Factor);
             UpdateElectronTransportRate();
             Sco = Ko / Kc * VcVo;
             Gamma = 0.5 / Sco;

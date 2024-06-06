@@ -183,45 +183,4 @@ namespace Models.DCAPST.Canopy
             return values;
         }
     }
-
-    /// <summary>
-    /// An instance of values present within an assimilation area
-    /// </summary>
-    public struct AreaValues
-    {
-        /// <summary>
-        /// 
-        /// </summary>
-        public double A { get; set; }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        public double Water { get; set; }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        public double Temperature { get; set; }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        public PathValues Ac1 { get; set; }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        public PathValues Ac2 { get; set; }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        public PathValues Aj { get; set; }
-    }
 }
