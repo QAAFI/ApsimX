@@ -10,6 +10,7 @@ namespace Models.DCAPST
     {
         private const double ABSOLUTE_0C = 273;
         private const double ABSOLUTE_25C = 298.15;
+        private const double ABSOLUTE_25C_X_GAS_CONSTANT = ABSOLUTE_25C * UNIVERSAL_GAS_CONSTANT;
         private const double UNIVERSAL_GAS_CONSTANT = 8.314;
 
         /// <summary>
@@ -148,16 +149,21 @@ namespace Models.DCAPST
 
         private void RecalculateParams()
         {
-            VcMaxT = Value(leafTemperature, rateAt25.VcMax, pathway.RubiscoActivity.Factor);
-            RdT = Value(leafTemperature, rateAt25.Rd, pathway.Respiration.Factor);
+            var leafTemperaturePlus0C = leafTemperature + ABSOLUTE_0C;
+            var leafTemperaturePlus0CMinus25C = leafTemperaturePlus0C - ABSOLUTE_25C;
+
+            VcMaxT = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, rateAt25.VcMax, pathway.RubiscoActivity.Factor);
+            RdT = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, rateAt25.Rd, pathway.Respiration.Factor);
             JMaxT = ValueOptimum(leafTemperature, rateAt25.JMax, pathway.ElectronTransportRateParams);
-            VpMaxT = Value(leafTemperature, rateAt25.VpMax, pathway.PEPcActivity.Factor);
-            GmT = Value(leafTemperature, rateAt25.Gm, pathway.MesophyllCO2ConductanceParams.Factor);
-            Kc = Value(leafTemperature, pathway.RubiscoCarboxylation.At25, pathway.RubiscoCarboxylation.Factor);
-            Ko = Value(leafTemperature, pathway.RubiscoOxygenation.At25, pathway.RubiscoOxygenation.Factor);
-            VcVo = Value(leafTemperature, pathway.RubiscoCarboxylationToOxygenation.At25, pathway.RubiscoCarboxylationToOxygenation.Factor);
-            Kp = Value(leafTemperature, pathway.PEPc.At25, pathway.PEPc.Factor);
+            VpMaxT = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, rateAt25.VpMax, pathway.PEPcActivity.Factor);
+            GmT = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, rateAt25.Gm, pathway.MesophyllCO2ConductanceParams.Factor);
+            Kc = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, pathway.RubiscoCarboxylation.At25, pathway.RubiscoCarboxylation.Factor);
+            Ko = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, pathway.RubiscoOxygenation.At25, pathway.RubiscoOxygenation.Factor);
+            VcVo = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, pathway.RubiscoCarboxylationToOxygenation.At25, pathway.RubiscoCarboxylationToOxygenation.Factor);
+            Kp = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, pathway.PEPc.At25, pathway.PEPc.Factor);
+            
             UpdateElectronTransportRate();
+            
             Sco = Ko / Kc * VcVo;
             Gamma = 0.5 / Sco;
             GmRd = RdT * 0.5;
@@ -169,10 +175,15 @@ namespace Models.DCAPST
         /// <remarks>
         /// See equation (1), A. Wu et al (2018) for details
         /// </remarks>
-        private static double Value(double temp, double P25, double tMin)
+        private static double Value(
+            double leafTemperaturePlus0C, 
+            double leafTemperaturePlus0CMinus25C,
+            double P25, 
+            double tMin
+        )
         {
-            var numerator = tMin * (temp + ABSOLUTE_0C - ABSOLUTE_25C);
-            var denominator = ABSOLUTE_25C * UNIVERSAL_GAS_CONSTANT * (temp + ABSOLUTE_0C);
+            var numerator = tMin * leafTemperaturePlus0CMinus25C;
+            var denominator = ABSOLUTE_25C_X_GAS_CONSTANT * leafTemperaturePlus0C;
 
             return P25 * Math.Exp(numerator / denominator);
         }
@@ -187,11 +198,13 @@ namespace Models.DCAPST
         {
             double tMin = p.TMin;
             double tOpt = p.TOpt;
+            double tOptMinusTMin = tOpt - tMin;
 
-            double alpha = Math.Log(2) / Math.Log((p.TMax - tMin) / (tOpt - tMin));
+            double alpha = Math.Log(2) / Math.Log((p.TMax - tMin) / (tOptMinusTMin));
+            double twoTimesAlpha = 2 * alpha;
             double tempMinusTMin = temp - tMin;
-            double numerator = 2 * Math.Pow(tempMinusTMin, alpha) * Math.Pow(tOpt - tMin, alpha) - Math.Pow(tempMinusTMin, 2 * alpha);
-            double denominator = Math.Pow(tOpt - tMin, 2 * alpha);
+            double numerator = 2 * Math.Pow(tempMinusTMin, alpha) * Math.Pow(tOptMinusTMin, alpha) - Math.Pow(tempMinusTMin, twoTimesAlpha);
+            double denominator = Math.Pow(tOptMinusTMin, twoTimesAlpha);
             double funcT = P25 * Math.Pow(numerator / denominator, p.Beta) / p.C;
 
             return funcT;
