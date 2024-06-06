@@ -90,11 +90,19 @@ namespace Models.DCAPST.Canopy
         /// <summary>
         /// Sets the temperature which is needed by the leaf and water interaction.
         /// </summary>
-        /// <param name="temperature"></param>
-        public void SetTemperature(double temperature)
+        /// <param name="leafTemperature"></param>
+        public void SetLeafTemperature(double leafTemperature)
         {
-            leaf.Temperature = temperature;
-            water.LeafTemp = temperature;
+            leaf.Temperature = leafTemperature;
+            water.LeafTemp = leafTemperature;
+        }
+
+        /// <summary>
+        /// Signals that the temperature has been updated so that we can recalculate parameters.
+        /// </summary>
+        public void TemperatureUpdated()
+        {
+            water.RecalculateParams();
         }
 
         /// <summary>

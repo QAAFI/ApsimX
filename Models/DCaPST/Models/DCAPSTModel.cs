@@ -15,22 +15,22 @@ namespace Models.DCAPST
         /// <summary>
         /// The solar geometry
         /// </summary>
-        private ISolarGeometry Solar { get; set; }
+        private readonly ISolarGeometry solar;
 
         /// <summary>
         /// The solar radiation
         /// </summary>
-        private ISolarRadiation Radiation { get; set; }
+        private readonly ISolarRadiation radiation;
 
         /// <summary>
         /// The environmental temperature
         /// </summary>
-        private ITemperature Temperature { get; set; }
+        private readonly ITemperature temperature;
 
         /// <summary>
         /// The canopy undergoing photosynthesis
         /// </summary>
-        private ICanopyAttributes Canopy { get; set; }
+        private readonly ICanopyAttributes canopy;
 
         /// <summary>
         /// The pathway parameters
@@ -109,22 +109,22 @@ namespace Models.DCAPST
         /// <param name="temperature"></param>
         /// <param name="pathway"></param>
         /// <param name="canopy"></param>
-        /// <param name="trans"></param>
+        /// <param name="transpiration"></param>
         public DCAPSTModel(
             ISolarGeometry solar,
             ISolarRadiation radiation,
             ITemperature temperature,
             IPathwayParameters pathway,
             ICanopyAttributes canopy,
-            Transpiration trans
+            Transpiration transpiration
         )
         {
-            Solar = solar;
-            Radiation = radiation;
-            Temperature = temperature;
+            this.solar = solar;
+            this.radiation = radiation;
+            this.temperature = temperature;
             this.pathway = pathway;
-            Canopy = canopy;
-            transpiration = trans;
+            this.canopy = canopy;
+            this.transpiration = transpiration;
         }
 
         /// <summary>
@@ -146,8 +146,8 @@ namespace Models.DCAPST
                 .ToArray();
 
 
-            Solar.Initialise();
-            Canopy.InitialiseDay(lai, sln);
+            solar.Initialise();
+            canopy.InitialiseDay(lai, sln);
 
             // UNLIMITED POTENTIAL CALCULATIONS
             // Note: In the potential case, we assume unlimited water and therefore supply = demand
@@ -231,10 +231,11 @@ namespace Models.DCAPST
         /// </summary>
         private bool TryInitiliase(IntervalValues I)
         {
-            Temperature.UpdateAirTemperature(I.Time);
-            Radiation.UpdateRadiationValues(I.Time);
-            var sunAngle = Solar.SunAngle(I.Time);
-            Canopy.DoSolarAdjustment(sunAngle);
+            temperature.UpdateAirTemperature(I.Time);
+            radiation.UpdateRadiationValues(I.Time);
+            transpiration.TemperatureUpdated();
+            var sunAngle = solar.SunAngle(I.Time);
+            canopy.DoSolarAdjustment(sunAngle);
 
             if (IsSensible())
                 return true;
@@ -252,8 +253,8 @@ namespace Models.DCAPST
         /// </summary>
         private bool IsSensible()
         {
-            var CPath = Canopy.Canopy;
-            var temp = Temperature.AirTemperature;
+            var CPath = canopy.Canopy;
+            var temp = temperature.AirTemperature;
 
             bool[] tempConditions = new bool[2]
             {
@@ -262,7 +263,7 @@ namespace Models.DCAPST
             };
 
             bool invalidTemp = tempConditions.Any(b => b == true);
-            bool invalidRadn = Radiation.Total <= double.Epsilon;
+            bool invalidRadn = radiation.Total <= double.Epsilon;
 
             if (invalidTemp || invalidRadn)
                 return false;
@@ -279,7 +280,7 @@ namespace Models.DCAPST
             {
                 if (!TryInitiliase(I)) continue;
 
-                InterceptedRadiation += Radiation.Total * Canopy.GetInterceptedRadiation() * 3600;
+                InterceptedRadiation += radiation.Total * canopy.GetInterceptedRadiation() * 3600;
 
                 DoTimestepUpdate(I);
             }
@@ -338,20 +339,20 @@ namespace Models.DCAPST
         /// </summary>
         public void DoTimestepUpdate(IntervalValues interval, double sunFraction = 0, double shadeFraction = 0)
         {
-            Canopy.DoTimestepAdjustment(Radiation);
+            canopy.DoTimestepAdjustment(radiation);
 
-            var totalHeat = Canopy.CalcBoundaryHeatConductance();
-            var sunlitHeat = Canopy.CalcSunlitBoundaryHeatConductance();
+            var totalHeat = canopy.CalcBoundaryHeatConductance();
+            var sunlitHeat = canopy.CalcSunlitBoundaryHeatConductance();
 
             var shadedHeat = (totalHeat == sunlitHeat) ? double.Epsilon : totalHeat - sunlitHeat;
 
-            interval.AirTemperature = Temperature.AirTemperature;
+            interval.AirTemperature = temperature.AirTemperature;
 
-            PerformPhotosynthesis(Canopy.Sunlit, sunlitHeat, sunFraction);
-            interval.Sunlit = Canopy.Sunlit.GetAreaValues();
+            PerformPhotosynthesis(canopy.Sunlit, sunlitHeat, sunFraction);
+            interval.Sunlit = canopy.Sunlit.GetAreaValues();
 
-            PerformPhotosynthesis(Canopy.Shaded, shadedHeat, shadeFraction);
-            interval.Shaded = Canopy.Shaded.GetAreaValues();
+            PerformPhotosynthesis(canopy.Shaded, shadedHeat, shadeFraction);
+            interval.Shaded = canopy.Shaded.GetAreaValues();
         }
 
         /// <summary>
@@ -364,7 +365,7 @@ namespace Models.DCAPST
         {
             transpiration.BoundaryHeatConductance = gbh;
             transpiration.Fraction = fraction;
-            area.DoPhotosynthesis(Temperature, transpiration);
+            area.DoPhotosynthesis(temperature, transpiration);
         }
 
         /// <summary>
