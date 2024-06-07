@@ -8,10 +8,10 @@ namespace Models.DCAPST
     /// </summary>
     public class TemperatureResponse
     {
+        private const double UNIVERSAL_GAS_CONSTANT = 8.314;
         private const double ABSOLUTE_0C = 273;
         private const double ABSOLUTE_25C = 298.15;
         private const double ABSOLUTE_25C_X_GAS_CONSTANT = ABSOLUTE_25C * UNIVERSAL_GAS_CONSTANT;
-        private const double UNIVERSAL_GAS_CONSTANT = 8.314;
 
         /// <summary>
         /// A collection of parameters as valued at 25 degrees Celsius
@@ -31,7 +31,7 @@ namespace Models.DCAPST
         /// <summary>
         /// Number of photons that reached the leaf
         /// </summary>
-        private double photoncount;
+        private double photonCount;
 
         /// <summary>
         /// The leaf temperature.
@@ -58,7 +58,6 @@ namespace Models.DCAPST
         private double gamma;
         private double gmRd;
 
-
         /// <summary>
         /// 
         /// </summary>
@@ -66,8 +65,8 @@ namespace Models.DCAPST
         /// <param name="pathway"></param>
         public TemperatureResponse(ICanopyParameters canopy, IPathwayParameters pathway)
         {
-            this.canopy = canopy;
-            this.pathway = pathway;
+            this.canopy = canopy ?? throw new ArgumentNullException(nameof(canopy));
+            this.pathway = pathway ?? throw new ArgumentNullException(nameof(pathway));
         }
 
         /// <summary>
@@ -77,8 +76,8 @@ namespace Models.DCAPST
         /// <param name="photons"></param>
         public void SetConditions(ParameterRates rates, double photons)
         {
-            rateAt25 = rates;
-            photoncount = photons;
+            rateAt25 = rates ?? throw new ArgumentNullException(nameof(rates));
+            photonCount = photons;
             paramsNeedUpdate = true;
         }
 
@@ -289,14 +288,14 @@ namespace Models.DCAPST
         /// See equation (1), A. Wu et al (2018) for details
         /// </remarks>
         private static double Value(
-            double leafTemperaturePlus0C, 
+            double leafTemperaturePlus0C,
             double leafTemperaturePlus0CMinus25C,
-            double P25, 
+            double P25,
             double tMin
         )
         {
-            var numerator = tMin * leafTemperaturePlus0CMinus25C;
-            var denominator = ABSOLUTE_25C_X_GAS_CONSTANT * leafTemperaturePlus0C;
+            double numerator = tMin * leafTemperaturePlus0CMinus25C;
+            double denominator = ABSOLUTE_25C_X_GAS_CONSTANT * leafTemperaturePlus0C;
 
             return P25 * Math.Exp(numerator / denominator);
         }
@@ -311,13 +310,13 @@ namespace Models.DCAPST
         {
             double tMin = p.TMin;
             double tOpt = p.TOpt;
+            double tMax = p.TMax;
             double tOptMinusTMin = tOpt - tMin;
 
-            double alpha = Math.Log(2) / Math.Log((p.TMax - tMin) / (tOptMinusTMin));
-            double twoTimesAlpha = 2 * alpha;
+            double alpha = Math.Log(2) / Math.Log((tMax - tMin) / tOptMinusTMin);
             double tempMinusTMin = temp - tMin;
-            double numerator = 2 * Math.Pow(tempMinusTMin, alpha) * Math.Pow(tOptMinusTMin, alpha) - Math.Pow(tempMinusTMin, twoTimesAlpha);
-            double denominator = Math.Pow(tOptMinusTMin, twoTimesAlpha);
+            double numerator = 2 * Math.Pow(tempMinusTMin, alpha) * Math.Pow(tOptMinusTMin, alpha) - Math.Pow(tempMinusTMin, 2 * alpha);
+            double denominator = Math.Pow(tOptMinusTMin, 2 * alpha);
             double funcT = P25 * Math.Pow(numerator / denominator, p.Beta) / p.C;
 
             return funcT;
@@ -328,9 +327,10 @@ namespace Models.DCAPST
         /// </summary>
         private void UpdateElectronTransportRate()
         {
-            var factor = photoncount * (1.0 - pathway.SpectralCorrectionFactor) / 2.0;
-            j = (factor + jMaxT - Math.Pow(Math.Pow(factor + jMaxT, 2) - 4 * canopy.CurvatureFactor * jMaxT * factor, 0.5))
-            / (2 * canopy.CurvatureFactor);
+            double factor = photonCount * (1.0 - pathway.SpectralCorrectionFactor) / 2.0;
+            double sumFactor = factor + jMaxT;
+            double sqrtTerm = Math.Sqrt(sumFactor * sumFactor - 4 * canopy.CurvatureFactor * jMaxT * factor);
+            j = (sumFactor - sqrtTerm) / (2 * canopy.CurvatureFactor);
         }
     }
 }
