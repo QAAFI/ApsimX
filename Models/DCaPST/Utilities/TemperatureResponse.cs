@@ -39,6 +39,27 @@ namespace Models.DCAPST
         private double leafTemperature;
 
         /// <summary>
+        /// Records whether the params need to be updated, due to something changing which 
+        /// has invalidated them.
+        /// </summary>
+        private bool paramsNeedUpdate;
+
+        private double vcMaxT;
+        private double rdT;
+        private double jMaxT;
+        private double vpMaxT;
+        private double gmT;
+        private double kc;
+        private double ko;
+        private double vcVo;
+        private double kp;
+        private double j;
+        private double sco;
+        private double gamma;
+        private double gmRd;
+
+
+        /// <summary>
         /// 
         /// </summary>
         /// <param name="canopy"></param>
@@ -58,8 +79,7 @@ namespace Models.DCAPST
         {
             rateAt25 = rates;
             photoncount = photons;
-
-            RecalculateParams();
+            paramsNeedUpdate = true;
         }
 
         /// <summary>
@@ -77,7 +97,7 @@ namespace Models.DCAPST
                 if (leafTemperature != value)
                 {
                     leafTemperature = value;
-                    RecalculateParams();
+                    paramsNeedUpdate = true;
                 }
             }
         }
@@ -85,88 +105,181 @@ namespace Models.DCAPST
         /// <summary>
         /// Maximum rate of rubisco carboxylation at the current leaf temperature (micro mol CO2 m^-2 ground s^-1)
         /// </summary>
-        public double VcMaxT { get; private set; }
+        public double VcMaxT 
+        {
+            get
+            {
+                if (paramsNeedUpdate) RecalculateParams();
+                return vcMaxT;
+            }
+        }
 
         /// <summary>
         /// Leaf respiration at the current leaf temperature (micro mol CO2 m^-2 ground s^-1)
         /// </summary>
-        public double RdT { get; private set; }
+        public double RdT
+        {
+            get
+            {
+                if (paramsNeedUpdate) RecalculateParams();
+                return rdT;
+            }
+        }
 
         /// <summary>
         /// Maximum rate of electron transport at the current leaf temperature (micro mol CO2 m^-2 ground s^-1)
         /// </summary>
-        public double JMaxT { get; private set; }
+        public double JMaxT
+        {
+            get
+            {
+                if (paramsNeedUpdate) RecalculateParams();
+                return jMaxT;
+            }
+        }
 
         /// <summary>
         /// Maximum PEP carboxylase activity at the current leaf temperature (micro mol CO2 m^-2 ground s^-1)
         /// </summary>
-        public double VpMaxT { get; private set; }
+        public double VpMaxT
+        {
+            get
+            {
+                if (paramsNeedUpdate) RecalculateParams();
+                return vpMaxT;
+            }
+        }
 
         /// <summary>
         /// Mesophyll conductance at the current leaf temperature (mol CO2 m^-2 ground s^-1 bar^-1)
         /// </summary>
-        public double GmT { get; private set; }
+        public double GmT
+        {
+            get
+            {
+                if (paramsNeedUpdate) RecalculateParams();
+                return gmT;
+            }
+        }
 
         /// <summary>
         /// Michaelis-Menten constant of Rubsico for CO2 (microbar)
         /// </summary>
-        public double Kc { get; private set; }
+        public double Kc
+        {
+            get
+            {
+                if (paramsNeedUpdate) RecalculateParams();
+                return kc;
+            }
+        }
 
         /// <summary>
         /// Michaelis-Menten constant of Rubsico for O2 (microbar)
         /// </summary>
-        public double Ko { get; private set; }
+        public double Ko
+        {
+            get
+            {
+                if (paramsNeedUpdate) RecalculateParams();
+                return ko;
+            }
+        }
 
         /// <summary>
         /// Ratio of Rubisco carboxylation to Rubisco oxygenation
         /// </summary>
-        public double VcVo { get; private set; }
+        public double VcVo
+        {
+            get
+            {
+                if (paramsNeedUpdate) RecalculateParams();
+                return vcVo;
+            }
+        }
 
         /// <summary>
         /// Michaelis-Menten constant of PEP carboxylase for CO2 (micro bar)
         /// </summary>
-        public double Kp { get; private set; }
+        public double Kp
+        {
+            get
+            {
+                if (paramsNeedUpdate) RecalculateParams();
+                return kp;
+            }
+        }
 
         /// <summary>
         /// Electron transport rate
         /// </summary>
-        public double J { get; private set; }
+        public double J
+        {
+            get
+            {
+                if (paramsNeedUpdate) RecalculateParams();
+                return j;
+            }
+        }
 
         /// <summary>
         /// Relative CO2/O2 specificity of Rubisco (bar bar^-1)
         /// </summary>
-        public double Sco { get; private set; }
+        public double Sco
+        {
+            get
+            {
+                if (paramsNeedUpdate) RecalculateParams();
+                return sco;
+            }
+        }
 
         /// <summary>
         /// Half the reciprocal of the relative rubisco specificity
         /// </summary>
-        public double Gamma { get; private set; }
+        public double Gamma
+        {
+            get
+            {
+                if (paramsNeedUpdate) RecalculateParams();
+                return gamma;
+            }
+        }
 
         /// <summary>
         /// Mesophyll respiration
         /// </summary>
-        public double GmRd { get; private set; }
+        public double GmRd
+        {
+            get
+            {
+                if (paramsNeedUpdate) RecalculateParams();
+                return gmRd;
+            }
+        }
 
         private void RecalculateParams()
         {
+            paramsNeedUpdate = false;
+
             var leafTemperaturePlus0C = leafTemperature + ABSOLUTE_0C;
             var leafTemperaturePlus0CMinus25C = leafTemperaturePlus0C - ABSOLUTE_25C;
 
-            VcMaxT = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, rateAt25.VcMax, pathway.RubiscoActivity.Factor);
-            RdT = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, rateAt25.Rd, pathway.Respiration.Factor);
-            JMaxT = ValueOptimum(leafTemperature, rateAt25.JMax, pathway.ElectronTransportRateParams);
-            VpMaxT = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, rateAt25.VpMax, pathway.PEPcActivity.Factor);
-            GmT = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, rateAt25.Gm, pathway.MesophyllCO2ConductanceParams.Factor);
-            Kc = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, pathway.RubiscoCarboxylation.At25, pathway.RubiscoCarboxylation.Factor);
-            Ko = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, pathway.RubiscoOxygenation.At25, pathway.RubiscoOxygenation.Factor);
-            VcVo = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, pathway.RubiscoCarboxylationToOxygenation.At25, pathway.RubiscoCarboxylationToOxygenation.Factor);
-            Kp = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, pathway.PEPc.At25, pathway.PEPc.Factor);
+            vcMaxT = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, rateAt25.VcMax, pathway.RubiscoActivity.Factor);
+            rdT = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, rateAt25.Rd, pathway.Respiration.Factor);
+            jMaxT = ValueOptimum(leafTemperature, rateAt25.JMax, pathway.ElectronTransportRateParams);
+            vpMaxT = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, rateAt25.VpMax, pathway.PEPcActivity.Factor);
+            gmT = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, rateAt25.Gm, pathway.MesophyllCO2ConductanceParams.Factor);
+            kc = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, pathway.RubiscoCarboxylation.At25, pathway.RubiscoCarboxylation.Factor);
+            ko = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, pathway.RubiscoOxygenation.At25, pathway.RubiscoOxygenation.Factor);
+            vcVo = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, pathway.RubiscoCarboxylationToOxygenation.At25, pathway.RubiscoCarboxylationToOxygenation.Factor);
+            kp = Value(leafTemperaturePlus0C, leafTemperaturePlus0CMinus25C, pathway.PEPc.At25, pathway.PEPc.Factor);
             
             UpdateElectronTransportRate();
             
-            Sco = Ko / Kc * VcVo;
-            Gamma = 0.5 / Sco;
-            GmRd = RdT * 0.5;
+            sco = Ko / Kc * VcVo;
+            gamma = 0.5 / Sco;
+            gmRd = RdT * 0.5;
         }
 
         /// <summary>
@@ -216,7 +329,7 @@ namespace Models.DCAPST
         private void UpdateElectronTransportRate()
         {
             var factor = photoncount * (1.0 - pathway.SpectralCorrectionFactor) / 2.0;
-            J = (factor + JMaxT - Math.Pow(Math.Pow(factor + JMaxT, 2) - 4 * canopy.CurvatureFactor * JMaxT * factor, 0.5))
+            j = (factor + jMaxT - Math.Pow(Math.Pow(factor + jMaxT, 2) - 4 * canopy.CurvatureFactor * jMaxT * factor, 0.5))
             / (2 * canopy.CurvatureFactor);
         }
     }
