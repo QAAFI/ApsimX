@@ -128,7 +128,7 @@ namespace Models.DCAPST
                 },
                 SpectralCorrectionFactor = 0.39609236234459,
                 PS2ActivityFraction = 0.1,
-                PEPRegeneration = 1000,
+                PEPRegeneration = 5000,
                 BundleSheathConductance = 0.003
             };
         }

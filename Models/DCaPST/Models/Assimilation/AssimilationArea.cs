@@ -70,9 +70,9 @@ namespace Models.DCAPST.Canopy
             Ac1.Type = PathwayType.Ac1;
             pathways.Add(Ac1);
 
-            // Conditionally include Ac2
-            Ac2.Type = PathwayType.Ac2;
-            if (assimilation is not AssimilationC3) pathways.Add(Ac2);
+            //// Conditionally include Ac2
+            //Ac2.Type = PathwayType.Ac2;
+            //if (assimilation is not AssimilationC3) pathways.Add(Ac2);
 
             // Always include Aj
             Aj.Type = PathwayType.Aj;
@@ -103,12 +103,15 @@ namespace Models.DCAPST.Canopy
             // Do the initial iterations
             DoIterations(transpiration, temperature.AirTemperature, true);
 
-            // If the result is not sensible, repeat the iterations without updating temperature
+            // If the iteration results are not sensible (e.g negative/0 concentrations), repeat the iterations
+            // without updating leaf temperature.
             if (GetCO2Rate() <= 0 || GetWaterUse() <= 0)
+            {
                 DoIterations(transpiration, temperature.AirTemperature, false);
 
-            // If the result is still not sensible, use default values (0's)
-            if (GetCO2Rate() <= 0 || GetWaterUse() <= 0) return;
+                // If the result is still not sensible, use default values (0's)
+                if (GetCO2Rate() <= 0 || GetWaterUse() <= 0) return;
+            }
 
             // Update results only if convergence succeeds
             CO2AssimilationRate = GetCO2Rate();
@@ -136,13 +139,14 @@ namespace Models.DCAPST.Canopy
             {
                 t.SetLeafTemperature(p.Temperature);
 
+                // Calculate the actual photosynthesis rate.
                 var func = t.UpdateA(assimilation, p);
                 assimilation.UpdatePartialPressures(p, t.LeafGmT, func);
 
-                if (assimilation is not AssimilationC3)
-                {
-                    t.UpdateA(assimilation, p);
-                }
+                //if (assimilation is not AssimilationC3)
+                //{
+                //    t.UpdateA(assimilation, p);
+                //}
 
                 if (updateT)
                 {
