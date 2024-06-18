@@ -145,38 +145,39 @@ namespace Models.DCAPST.Canopy
         /// </summary>
         private void CalcAbsorbedRadiations(ISolarRadiation radiation)
         {
-            // Set parameters
+            // Set parameters for visible (PAR) calculations
             Absorbed.DiffuseExtinction = Canopy.DiffuseExtCoeff;
             Absorbed.LeafScattering = Canopy.LeafScatteringCoeff;
             Absorbed.DiffuseReflection = Canopy.DiffuseReflectionCoeff;
 
             // Photon calculations (used by photosynthesis)
-            var photons = Absorbed.CalcTotalRadiation(radiation.DirectPAR, radiation.DiffusePAR);
+            double photons = Absorbed.CalcTotalRadiation(radiation.DirectPAR, radiation.DiffusePAR);
             Sunlit.PhotonCount = Absorbed.CalcSunlitRadiation(radiation.DirectPAR, radiation.DiffusePAR);
             Shaded.PhotonCount = photons - Sunlit.PhotonCount;
 
             // Energy calculations (used by water interaction)
-            var PARDirect = radiation.Direct * 0.5 * 1000000;
-            var PARDiffuse = radiation.Diffuse * 0.5 * 1000000;
-            var NIRDirect = radiation.Direct * 0.5 * 1000000;
-            var NIRDiffuse = radiation.Diffuse * 0.5 * 1000000;
+            double PARDirect = radiation.Direct * 0.5 * 1e6;
+            double PARDiffuse = radiation.Diffuse * 0.5 * 1e6;
+            double NIRDirect = PARDirect;
+            double NIRDiffuse = PARDiffuse;
 
-            var PARTotalIrradiance = Absorbed.CalcTotalRadiation(PARDirect, PARDiffuse);
-            var SunlitPARTotalIrradiance = Absorbed.CalcSunlitRadiation(PARDirect, PARDiffuse);
-            var ShadedPARTotalIrradiance = PARTotalIrradiance - SunlitPARTotalIrradiance;
+            double PARTotalIrradiance = Absorbed.CalcTotalRadiation(PARDirect, PARDiffuse);
+            double SunlitPARTotalIrradiance = Absorbed.CalcSunlitRadiation(PARDirect, PARDiffuse);
+            double ShadedPARTotalIrradiance = PARTotalIrradiance - SunlitPARTotalIrradiance;
 
             // Adjust parameters for NIR calculations
             Absorbed.DiffuseExtinction = Canopy.DiffuseExtCoeffNIR;
             Absorbed.LeafScattering = Canopy.LeafScatteringCoeffNIR;
             Absorbed.DiffuseReflection = Canopy.DiffuseReflectionCoeffNIR;
 
-            var NIRTotalIrradiance = Absorbed.CalcTotalRadiation(NIRDirect, NIRDiffuse);
-            var SunlitNIRTotalIrradiance = Absorbed.CalcSunlitRadiation(NIRDirect, NIRDiffuse);
-            var ShadedNIRTotalIrradiance = NIRTotalIrradiance - SunlitNIRTotalIrradiance;
+            double NIRTotalIrradiance = Absorbed.CalcTotalRadiation(NIRDirect, NIRDiffuse);
+            double SunlitNIRTotalIrradiance = Absorbed.CalcSunlitRadiation(NIRDirect, NIRDiffuse);
+            double ShadedNIRTotalIrradiance = NIRTotalIrradiance - SunlitNIRTotalIrradiance;
 
             Sunlit.AbsorbedRadiation = SunlitPARTotalIrradiance + SunlitNIRTotalIrradiance;
             Shaded.AbsorbedRadiation = ShadedPARTotalIrradiance + ShadedNIRTotalIrradiance;
         }
+
 
         /// <summary>
         /// Calculates properties of the canopy, based on how much of the canopy is currently in direct sunlight
