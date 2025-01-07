@@ -257,8 +257,9 @@ namespace Models.Storage
                     SpinWait.SpinUntil(() => commandRunner.SimsRunning.IsEmpty);
                     Connection.EndWriting();
                 }
-                catch
+                catch (Exception ex)
                 {
+                    LogError(ex);
                     // Swallow exceptions
                 }
                 finally
@@ -274,6 +275,20 @@ namespace Models.Storage
                     units.Clear();
                 }
             }
+        }
+
+        private void LogError(string error)
+        {
+            Console.WriteLine("*******************************************************");
+            Console.WriteLine(error);
+            Console.WriteLine("*******************************************************");
+        }
+
+        private void LogError(Exception error)
+        {
+            Console.WriteLine("*******************************************************");
+            Console.WriteLine(error);
+            Console.WriteLine("*******************************************************");
         }
 
         /// <summary>Called by the job runner when all jobs completed</summary>
@@ -676,6 +691,18 @@ namespace Models.Storage
                     simulationsTable.Rows.Add(row);
                 }
                 WriteTable(simulationsTable, deleteAllData: true);
+            }
+            else
+            {
+                LogError($"{nameof(WriteSimulationIDs)} being called but either simulationIDs.Count: {simulationIDs.Count} or {Connection.GetTableNames().Count} are <=0.");
+                foreach (var simulationID in simulationIDs)
+                {
+                    LogError($"simulationID: {simulationID}");
+                }
+                foreach (var tableName in Connection.GetTableNames())
+                {
+                    LogError($"tableName: {tableName}");
+                }
             }
         }
 
