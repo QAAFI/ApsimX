@@ -256,6 +256,8 @@ namespace Models.Core.Run
         /// <returns>A list of exception or null if no exceptions thrown.</returns>
         public List<Exception> Run()
         {
+            Console.WriteLine("***********************************************");
+
             startTime = DateTime.Now;
             ExceptionsThrown = new List<Exception>();
 
